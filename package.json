@@ -1,0 +1,14 @@
+{
+  "name": "coride",
+  "private": true,
+  "version": "0.1.0",
+  "description": "CoRide monorepo workspace root (pnpm workspaces). Application packages live in subdirectories, e.g. backend/.",
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "build": "pnpm --filter backend build",
+    "typecheck": "pnpm --filter backend typecheck"
+  }
+}
