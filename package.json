@@ -2,13 +2,34 @@
   "name": "coride",
   "private": true,
   "version": "0.1.0",
-  "description": "CoRide monorepo workspace root (pnpm workspaces). Application packages live in subdirectories, e.g. backend/.",
-  "engines": {
-    "node": ">=18",
-    "pnpm": ">=9"
-  },
+  "description": "CoRide ride-sharing platform (Next.js App Router + Prisma + PostgreSQL)",
   "scripts": {
-    "build": "pnpm --filter backend build",
-    "typecheck": "pnpm --filter backend typecheck"
+    "dev": "next dev -H 0.0.0.0",
+    "start": "NODE_ENV=production next start -H 0.0.0.0",
+    "build": "NODE_ENV=production next build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.8.0",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "next": "^15.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^20.14.9",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prisma": "^6.8.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.0"
   }
 }
