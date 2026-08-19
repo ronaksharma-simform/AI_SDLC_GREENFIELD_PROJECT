@@ -1,9 +1,12 @@
 node_modules/
+.next/
 dist/
 build/
+coverage/
 .env
 .env.local
 *.log
+*.tsbuildinfo
 
 # AI-SDLC internal metadata — must never be committed
 .ai-sdlc/
