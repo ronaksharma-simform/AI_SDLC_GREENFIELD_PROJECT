@@ -31,3 +31,23 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+/**
+ * Zod schema for NextAuth credentials sign-in (the `authorize` callback).
+ *
+ * - `email` is normalised exactly like registration (trimmed + lowercased) so
+ *   lookups match the canonical stored form.
+ * - `password` is only required to be non-empty here: login is verified with
+ *   bcrypt, so we deliberately do not re-impose registration length rules on
+ *   an existing credential attempt.
+ */
+export const loginSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('Please provide a valid email address.'),
+  password: z.string().min(1, 'Password is required.')
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
