@@ -105,22 +105,63 @@ export const vehicleSchema = z.object({
 export type VehicleInput = z.infer<typeof vehicleSchema>;
 
 /**
- * Ride field limits. `source`/`destination` map to `varchar(255)` columns and
- * `notes` maps to `varchar(280)`, so the schemas cap input to the same sizes.
+ * Ride field limits. `sourceAddress`/`destinationAddress` map to the renamed
+ * `varchar(255)` address columns and `notes` maps to `varchar(280)`, so the
+ * schemas cap input to the same sizes.
  */
-const RIDE_SOURCE_MAX = 255;
-const RIDE_DESTINATION_MAX = 255;
+const RIDE_ADDRESS_MAX = 255;
+const PLACE_ID_MAX = 255;
 const RIDE_NOTES_MAX = 280;
 
 /** A departure is only valid if it is strictly in the future. */
 const futureDeparture = (date: Date) => date.getTime() > Date.now();
 
 /**
+ * A structured location value used for both a ride's source and destination.
+ *
+ * - `latitude` / `longitude` are coerced to numbers and bounded to valid
+ *   coordinate ranges (the same bounds the geocode proxy enforces).
+ * - `address` is the resolved, human-readable location name (from reverse
+ *   geocoding or manually edited by the user). It is required: REQ-11 blocks a
+ *   ride from being created without a location name.
+ * - `placeId` is an optional, provider-specific identifier returned by the
+ *   geocoding service. It is accepted for caching/re-querying but is not
+ *   persisted on the Ride entity.
+ */
+export const locationInputSchema = z.object({
+  latitude: z.coerce
+    .number()
+    .min(-90, 'Latitude must be between -90 and 90.')
+    .max(90, 'Latitude must be between -90 and 90.'),
+  longitude: z.coerce
+    .number()
+    .min(-180, 'Longitude must be between -180 and 180.')
+    .max(180, 'Longitude must be between -180 and 180.'),
+  address: z
+    .string()
+    .trim()
+    .min(2, 'Address must be at least 2 characters long.')
+    .max(RIDE_ADDRESS_MAX, `Address must be at most ${RIDE_ADDRESS_MAX} characters long.`),
+  placeId: z
+    .string()
+    .trim()
+    .max(PLACE_ID_MAX, `Place ID must be at most ${PLACE_ID_MAX} characters long.`)
+    .optional()
+    .nullable()
+    .transform((value) => (value && value.length > 0 ? value : undefined))
+});
+
+export type LocationInput = z.infer<typeof locationInputSchema>;
+
+/**
  * Zod schema for `POST /api/rides`.
  *
  * - `vehicleId` must be a UUID. Ownership of the referenced vehicle is verified
  *   server-side in the route (never trust a client-submitted owner).
- * - `source` / `destination` are required, trimmed, and at least 2 characters.
+ * - `source` / `destination` are structured `LocationInput` values (coordinates
+ *   + a resolved/manually-entered address). The "source and destination must not
+ *   be the same point" rule is enforced in the route after parsing (it spans two
+ *   fields).
  * - `departureTime` is coerced from a number or ISO string and must be in the
  *   future.
  * - `seatsTotal` is coerced from a number or numeric string and must be an
@@ -130,16 +171,8 @@ const futureDeparture = (date: Date) => date.getTime() > Date.now();
  */
 export const rideCreateSchema = z.object({
   vehicleId: z.string().uuid('A valid vehicle ID is required.'),
-  source: z
-    .string()
-    .trim()
-    .min(2, 'Source must be at least 2 characters long.')
-    .max(RIDE_SOURCE_MAX, `Source must be at most ${RIDE_SOURCE_MAX} characters long.`),
-  destination: z
-    .string()
-    .trim()
-    .min(2, 'Destination must be at least 2 characters long.')
-    .max(RIDE_DESTINATION_MAX, `Destination must be at most ${RIDE_DESTINATION_MAX} characters long.`),
+  source: locationInputSchema,
+  destination: locationInputSchema,
   departureTime: z
     .coerce
     .date()
@@ -167,18 +200,8 @@ export type RideCreateInput = z.infer<typeof rideCreateSchema>;
  */
 export const rideUpdateSchema = z.object({
   vehicleId: z.string().uuid('A valid vehicle ID is required.').optional(),
-  source: z
-    .string()
-    .trim()
-    .min(2, 'Source must be at least 2 characters long.')
-    .max(RIDE_SOURCE_MAX, `Source must be at most ${RIDE_SOURCE_MAX} characters long.`)
-    .optional(),
-  destination: z
-    .string()
-    .trim()
-    .min(2, 'Destination must be at least 2 characters long.')
-    .max(RIDE_DESTINATION_MAX, `Destination must be at most ${RIDE_DESTINATION_MAX} characters long.`)
-    .optional(),
+  source: locationInputSchema.optional(),
+  destination: locationInputSchema.optional(),
   departureTime: z
     .coerce
     .date()

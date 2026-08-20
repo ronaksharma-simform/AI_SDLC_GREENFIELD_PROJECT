@@ -113,8 +113,8 @@ export default async function RidesPage() {
                     <TableRow key={ride.id}>
                       <TableCell>
                         <div className="font-medium">
-                          {ride.source} <span className="text-muted-foreground">&rarr;</span>{' '}
-                          {ride.destination}
+                          {ride.sourceAddress} <span className="text-muted-foreground">&rarr;</span>{' '}
+                          {ride.destinationAddress}
                         </div>
                         <div className="text-xs text-muted-foreground sm:hidden">
                           {formatDateTime(ride.departureTime)}

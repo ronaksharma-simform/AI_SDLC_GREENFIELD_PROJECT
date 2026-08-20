@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Field } from '@/components/field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LocationPicker, type LocationValue } from '@/components/location-picker';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,8 +31,12 @@ interface VehicleOption {
 
 interface RideDetail {
   id: string;
-  source: string;
-  destination: string;
+  sourceLatitude?: number | string | null;
+  sourceLongitude?: number | string | null;
+  sourceAddress: string;
+  destinationLatitude?: number | string | null;
+  destinationLongitude?: number | string | null;
+  destinationAddress: string;
   departureTime: string;
   seatsTotal: number;
   seatsAvailable: number;
@@ -62,6 +67,29 @@ function toDatetimeLocal(iso: string): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
+/** Builds a picker value from a ride's stored location fields (if coordinates exist). */
+function toLocation(
+  latitude: number | string | null | undefined,
+  longitude: number | string | null | undefined,
+  address: string
+): LocationValue | null {
+  if (latitude == null || longitude == null || latitude === '' || longitude === '') return null;
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { latitude: lat, longitude: lng, address };
+}
+
+function toLocationPayload(location: LocationValue | null) {
+  if (!location) return null;
+  return {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    address: location.address,
+    ...(location.placeId ? { placeId: location.placeId } : {})
+  };
+}
+
 export function RideDetailForm({
   ride,
   vehicles,
@@ -74,8 +102,12 @@ export function RideDetailForm({
   const router = useRouter();
 
   const [vehicleId, setVehicleId] = useState(ride.vehicleId);
-  const [source, setSource] = useState(ride.source);
-  const [destination, setDestination] = useState(ride.destination);
+  const [source, setSource] = useState<LocationValue | null>(() =>
+    toLocation(ride.sourceLatitude, ride.sourceLongitude, ride.sourceAddress)
+  );
+  const [destination, setDestination] = useState<LocationValue | null>(() =>
+    toLocation(ride.destinationLatitude, ride.destinationLongitude, ride.destinationAddress)
+  );
   const [departureTime, setDepartureTime] = useState(toDatetimeLocal(ride.departureTime));
   const [seatsTotal, setSeatsTotal] = useState(ride.seatsTotal);
   const [notes, setNotes] = useState(ride.notes ?? '');
@@ -98,10 +130,10 @@ export function RideDetailForm({
     setLoading(true);
 
     const payload: Record<string, unknown> = {
-      source: source.trim(),
-      destination: destination.trim(),
       notes: notes.trim() || null
     };
+    if (source) payload.source = toLocationPayload(source);
+    if (destination) payload.destination = toLocationPayload(destination);
     if (!locked) {
       payload.vehicleId = vehicleId;
       payload.departureTime = departureTime;
@@ -123,8 +155,16 @@ export function RideDetailForm({
       const body: RideResponse = await res.json();
       if (res.ok && body.ok && body.ride) {
         setSuccess('Ride updated.');
-        setSource(body.ride.source);
-        setDestination(body.ride.destination);
+        setSource(
+          toLocation(body.ride.sourceLatitude, body.ride.sourceLongitude, body.ride.sourceAddress)
+        );
+        setDestination(
+          toLocation(
+            body.ride.destinationLatitude,
+            body.ride.destinationLongitude,
+            body.ride.destinationAddress
+          )
+        );
         setNotes(body.ride.notes ?? '');
         setVehicleId(body.ride.vehicleId);
         setDepartureTime(toDatetimeLocal(body.ride.departureTime));
@@ -206,35 +246,27 @@ export function RideDetailForm({
         </Select>
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Source" htmlFor="source" required errors={fieldErrors?.source}>
-          <Input
-            id="source"
-            name="source"
-            type="text"
-            required
-            minLength={2}
-            disabled={cancelled}
-            value={source}
-            onChange={(event) => setSource(event.target.value)}
-            aria-invalid={fieldErrors?.source ? true : undefined}
-          />
-        </Field>
+      <LocationPicker
+        id="source"
+        label="Source"
+        value={source}
+        onChange={setSource}
+        errors={fieldErrors?.source}
+        disabled={cancelled}
+        initialAddress={ride.sourceAddress}
+        hint="Pick up location"
+      />
 
-        <Field label="Destination" htmlFor="destination" required errors={fieldErrors?.destination}>
-          <Input
-            id="destination"
-            name="destination"
-            type="text"
-            required
-            minLength={2}
-            disabled={cancelled}
-            value={destination}
-            onChange={(event) => setDestination(event.target.value)}
-            aria-invalid={fieldErrors?.destination ? true : undefined}
-          />
-        </Field>
-      </div>
+      <LocationPicker
+        id="destination"
+        label="Destination"
+        value={destination}
+        onChange={setDestination}
+        errors={fieldErrors?.destination}
+        disabled={cancelled}
+        initialAddress={ride.destinationAddress}
+        hint="Drop off location"
+      />
 
       <Field label="Departure time" htmlFor="departureTime" required errors={fieldErrors?.departureTime}>
         <Input

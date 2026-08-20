@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { rideUpdateSchema } from '@/lib/validation';
-import { isRideLocked, isValidUuid } from '@/lib/rides';
+import { areLocationsTooClose, isRideLocked, isValidUuid } from '@/lib/rides';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -150,9 +150,50 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     const data: Prisma.RideUncheckedUpdateInput = {};
 
-    if (input.source !== undefined) data.source = input.source;
-    if (input.destination !== undefined) data.destination = input.destination;
+    if (input.source !== undefined) {
+      data.sourceLatitude = input.source.latitude;
+      data.sourceLongitude = input.source.longitude;
+      data.sourceAddress = input.source.address;
+    }
+    if (input.destination !== undefined) {
+      data.destinationLatitude = input.destination.latitude;
+      data.destinationLongitude = input.destination.longitude;
+      data.destinationAddress = input.destination.address;
+    }
     if (input.notes !== undefined) data.notes = input.notes;
+
+    // Section 8 — Validation Rules: the ride's source and destination must not
+    // resolve to the same point. Use the merged value (incoming field if the
+    // caller edited it, otherwise the current stored value). The check only
+    // applies once both sides actually carry coordinates — a legacy ride with
+    // null coordinates on one side can still have its other details edited.
+    const mergedSource =
+      input.source !== undefined
+        ? input.source
+        : ride.sourceLatitude != null && ride.sourceLongitude != null
+          ? {
+              latitude: Number(ride.sourceLatitude),
+              longitude: Number(ride.sourceLongitude),
+              address: ride.sourceAddress
+            }
+          : null;
+    const mergedDestination =
+      input.destination !== undefined
+        ? input.destination
+        : ride.destinationLatitude != null && ride.destinationLongitude != null
+          ? {
+              latitude: Number(ride.destinationLatitude),
+              longitude: Number(ride.destinationLongitude),
+              address: ride.destinationAddress
+            }
+          : null;
+
+    if (mergedSource && mergedDestination && areLocationsTooClose(mergedSource, mergedDestination)) {
+      return Response.json(
+        { ok: false, error: 'Source and destination must be different locations.' },
+        { status: 400 }
+      );
+    }
 
     // Determine the vehicle that will serve the ride after this edit.
     let targetVehicle = ride.vehicle;
