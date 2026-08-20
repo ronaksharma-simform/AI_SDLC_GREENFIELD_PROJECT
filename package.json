@@ -9,6 +9,9 @@
   },
   "scripts": {
     "build": "pnpm --filter backend build",
-    "typecheck": "pnpm --filter backend typecheck"
+    "start": "pnpm --filter backend start",
+    "dev": "pnpm --filter backend dev",
+    "typecheck": "pnpm --filter backend typecheck",
+    "test": "pnpm --filter backend test"
   }
 }
