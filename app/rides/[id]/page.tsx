@@ -1,13 +1,18 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
+import { TriangleAlert } from 'lucide-react';
+
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatDateTime } from '@/lib/format-date';
 import { isRideLocked } from '@/lib/rides';
+import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { RideDetailForm } from './ride-detail-form';
 
 export const metadata = {
-  title: 'Ride Details | CoRide'
+  title: 'Ride Details'
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -17,13 +22,19 @@ const STATUS_LABELS: Record<string, string> = {
   COMPLETED: 'Completed'
 };
 
-/**
- * Ride detail page (REQ-8).
- *
- * Shows one of the signed-in user's rides and lets them edit or cancel it. A
- * ride that does not exist — or belongs to someone else — renders a 404 so we
- * never confirm the existence of another user's ride.
- */
+function statusBadgeVariant(status: string): 'success' | 'warning' | 'destructive' | 'secondary' {
+  switch (status) {
+    case 'ACTIVE':
+      return 'success';
+    case 'FULL':
+      return 'warning';
+    case 'CANCELLED':
+      return 'destructive';
+    default:
+      return 'secondary';
+  }
+}
+
 export default async function RideDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -49,61 +60,92 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
   const locked = isRideLocked(ride);
 
   return (
-    <main style={{ maxWidth: 560, margin: '0 auto', padding: '2rem 1rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Ride details</h1>
+    <main className="container py-10">
+      <div className="mx-auto max-w-xl space-y-6">
+        <header>
+          <h1 className="text-3xl font-bold tracking-tight">Ride details</h1>
+          <p className="mt-1 text-muted-foreground">
+            Review your ride and update the details below.
+          </p>
+        </header>
 
-      <p style={{ fontWeight: 600, fontSize: '1.1rem' }}>
-        {ride.source} &rarr; {ride.destination}
-      </p>
-      <p style={{ margin: '0.25rem 0', color: '#555' }}>
-        Departure: {formatDateTime(ride.departureTime)}
-      </p>
-      <p style={{ margin: '0.25rem 0', color: '#555' }}>
-        Vehicle: {ride.vehicle.year} {ride.vehicle.make} {ride.vehicle.model} (
-        {ride.vehicle.licensePlate})
-      </p>
-      <p style={{ margin: '0.25rem 0', color: '#555' }}>
-        Seats: {ride.seatsAvailable} of {ride.seatsTotal} available &middot; Status:{' '}
-        {STATUS_LABELS[ride.status] ?? ride.status}
-      </p>
-      {ride.notes && (
-        <p style={{ margin: '0.25rem 0', color: '#555' }}>Notes: {ride.notes}</p>
-      )}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex flex-wrap items-center gap-2">
+              {ride.source} <span className="text-muted-foreground">&rarr;</span> {ride.destination}
+              <Badge variant={statusBadgeVariant(ride.status)}>
+                {STATUS_LABELS[ride.status] ?? ride.status}
+              </Badge>
+            </CardTitle>
+            <CardDescription>Departure: {formatDateTime(ride.departureTime)}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">Vehicle</dt>
+                <dd className="mt-0.5 font-medium">
+                  {ride.vehicle.year} {ride.vehicle.make} {ride.vehicle.model} (
+                  {ride.vehicle.licensePlate})
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Seats</dt>
+                <dd className="mt-0.5 font-medium">
+                  {ride.seatsAvailable} of {ride.seatsTotal} available
+                </dd>
+              </div>
+              {ride.notes ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-sm text-muted-foreground">Notes</dt>
+                  <dd className="mt-0.5 font-medium">{ride.notes}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </CardContent>
+        </Card>
 
-      {locked && (
-        <p
-          role="status"
-          style={{ background: '#fff4d6', border: '1px solid #e6c15a', borderRadius: 6, padding: '0.5rem 0.75rem' }}
-        >
-          This ride is locked because a seat has already been accepted. Vehicle, seat
-          count, and departure time can no longer be changed.
+        {locked ? (
+          <Alert variant="warning">
+            <TriangleAlert className="h-4 w-4" />
+            <AlertTitle>Ride locked</AlertTitle>
+            <AlertDescription>
+              This ride is locked because a seat has already been accepted. Vehicle, seat count, and
+              departure time can no longer be changed.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
+        <Card>
+          <CardContent className="p-6">
+            <RideDetailForm
+              ride={{
+                id: ride.id,
+                source: ride.source,
+                destination: ride.destination,
+                departureTime: ride.departureTime.toISOString(),
+                seatsTotal: ride.seatsTotal,
+                seatsAvailable: ride.seatsAvailable,
+                status: ride.status,
+                notes: ride.notes,
+                vehicleId: ride.vehicleId,
+                vehicle: ride.vehicle
+              }}
+              vehicles={vehicles.map((vehicle) => ({
+                id: vehicle.id,
+                label: `${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})`,
+                seatCapacity: vehicle.seatCapacity
+              }))}
+              locked={locked}
+            />
+          </CardContent>
+        </Card>
+
+        <p className="text-sm text-muted-foreground">
+          <Link href="/rides" className="text-primary underline-offset-4 hover:underline">
+            Back to my rides
+          </Link>
         </p>
-      )}
-
-      <RideDetailForm
-        ride={{
-          id: ride.id,
-          source: ride.source,
-          destination: ride.destination,
-          departureTime: ride.departureTime.toISOString(),
-          seatsTotal: ride.seatsTotal,
-          seatsAvailable: ride.seatsAvailable,
-          status: ride.status,
-          notes: ride.notes,
-          vehicleId: ride.vehicleId,
-          vehicle: ride.vehicle
-        }}
-        vehicles={vehicles.map((vehicle) => ({
-          id: vehicle.id,
-          label: `${vehicle.year} ${vehicle.make} ${vehicle.model} (${vehicle.licensePlate})`,
-          seatCapacity: vehicle.seatCapacity
-        }))}
-        locked={locked}
-      />
-
-      <p style={{ marginTop: '1rem' }}>
-        <Link href="/rides">Back to my rides</Link>
-      </p>
+      </div>
     </main>
   );
 }

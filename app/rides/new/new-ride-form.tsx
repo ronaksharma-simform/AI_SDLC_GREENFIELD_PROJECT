@@ -1,6 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Field } from '@/components/field';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface VehicleOption {
   id: string;
@@ -77,84 +85,85 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
-      {error && (
-        <p role="alert" style={{ color: '#b00020' }}>
-          {error}
-        </p>
-      )}
-      {success && (
-        <p role="status" style={{ color: '#1e7d34' }}>
-          {success}
-        </p>
-      )}
+    <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      {success ? (
+        <Alert variant="success" role="status">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      ) : null}
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="vehicleId" style={labelStyle}>
-          Vehicle
-        </label>
-        <select
+      <Field label="Vehicle" htmlFor="vehicleId" required errors={fieldErrors?.vehicleId}>
+        <Select
           id="vehicleId"
           name="vehicleId"
           required
           value={vehicleId}
           onChange={(event) => setVehicleId(event.target.value)}
-          style={inputStyle}
+          aria-invalid={fieldErrors?.vehicleId ? true : undefined}
         >
           {vehicles.map((vehicle) => (
             <option key={vehicle.id} value={vehicle.id}>
               {vehicle.label}
             </option>
           ))}
-        </select>
-        {fieldErrors?.vehicleId?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
+        </Select>
+      </Field>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Source" htmlFor="source" required errors={fieldErrors?.source}>
+          <Input
+            id="source"
+            name="source"
+            type="text"
+            required
+            minLength={2}
+            autoComplete="off"
+            aria-invalid={fieldErrors?.source ? true : undefined}
+          />
+        </Field>
+
+        <Field label="Destination" htmlFor="destination" required errors={fieldErrors?.destination}>
+          <Input
+            id="destination"
+            name="destination"
+            type="text"
+            required
+            minLength={2}
+            autoComplete="off"
+            aria-invalid={fieldErrors?.destination ? true : undefined}
+          />
+        </Field>
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="source" style={labelStyle}>
-          Source
-        </label>
-        <input id="source" name="source" type="text" required minLength={2} autoComplete="off" style={inputStyle} />
-        {fieldErrors?.source?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
+      <Field label="Departure time" htmlFor="departureTime" required errors={fieldErrors?.departureTime}>
+        <Input
+          id="departureTime"
+          name="departureTime"
+          type="datetime-local"
+          required
+          aria-invalid={fieldErrors?.departureTime ? true : undefined}
+        />
+      </Field>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="destination" style={labelStyle}>
-          Destination
-        </label>
-        <input id="destination" name="destination" type="text" required minLength={2} autoComplete="off" style={inputStyle} />
-        {fieldErrors?.destination?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="departureTime" style={labelStyle}>
-          Departure time
-        </label>
-        <input id="departureTime" name="departureTime" type="datetime-local" required style={inputStyle} />
-        {fieldErrors?.departureTime?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="seatsTotal" style={labelStyle}>
-          Seats to offer
-        </label>
-        <input
+      <Field
+        label="Seats to offer"
+        htmlFor="seatsTotal"
+        required
+        hint={
+          selectedVehicle
+            ? `Your ${selectedVehicle.label} has ${selectedVehicle.seatCapacity} seats.`
+            : undefined
+        }
+        errors={fieldErrors?.seatsTotal}
+      >
+        <Input
           id="seatsTotal"
           name="seatsTotal"
           type="number"
@@ -162,49 +171,29 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
           min={1}
           max={selectedVehicle?.seatCapacity ?? 1}
           defaultValue={selectedVehicle?.seatCapacity ?? 1}
-          style={inputStyle}
+          aria-invalid={fieldErrors?.seatsTotal ? true : undefined}
         />
-        <small style={{ color: '#555' }}>
-          {selectedVehicle ? `Your ${selectedVehicle.label} has ${selectedVehicle.seatCapacity} seats.` : ''}
-        </small>
-        {fieldErrors?.seatsTotal?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
+      </Field>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="notes" style={labelStyle}>
-          Notes (optional)
-        </label>
-        <textarea
+      <Field
+        label="Notes"
+        htmlFor="notes"
+        hint="Optional — e.g. meeting point, luggage rules."
+        errors={fieldErrors?.notes}
+      >
+        <Textarea
           id="notes"
           name="notes"
           rows={2}
           maxLength={280}
           placeholder="e.g. meeting point, luggage rules"
-          style={inputStyle}
+          aria-invalid={fieldErrors?.notes ? true : undefined}
         />
-        {fieldErrors?.notes?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
+      </Field>
 
-      <button type="submit" disabled={loading} style={{ padding: '0.6rem 1.2rem', cursor: loading ? 'wait' : 'pointer' }}>
+      <Button type="submit" disabled={loading} size="lg" className="w-full sm:w-auto">
         {loading ? 'Publishing…' : 'Offer ride'}
-      </button>
+      </Button>
     </form>
   );
 }
-
-const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '0.25rem' };
-
-const inputStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: '0.5rem',
-  boxSizing: 'border-box'
-};

@@ -1,6 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
+import { AlertCircle, CarFront, CheckCircle2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Field } from '@/components/field';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface RegisterResponse {
   ok: boolean;
@@ -48,58 +56,67 @@ export default function SignupPage() {
   }
 
   return (
-    <main style={{ maxWidth: 420, margin: '0 auto', padding: '2rem 1rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Create your CoRide account</h1>
-      {error && (
-        <p role="alert" style={{ color: '#b00020' }}>
-          {error}
-        </p>
-      )}
-      {success && (
-        <p role="status" style={{ color: '#1e7d34' }}>
-          {success}
-        </p>
-      )}
-      <form onSubmit={handleSubmit} noValidate>
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="name" style={labelStyle}>
-            Name (optional)
-          </label>
-          <input id="name" name="name" type="text" autoComplete="name" style={inputStyle} />
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="email" style={labelStyle}>
-            Email
-          </label>
-          <input id="email" name="email" type="email" required autoComplete="email" style={inputStyle} />
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="password" style={labelStyle}>
-            Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            autoComplete="new-password"
-            style={inputStyle}
-          />
-        </div>
-        <button type="submit" disabled={loading} style={{ padding: '0.6rem 1.2rem', cursor: loading ? 'wait' : 'pointer' }}>
-          {loading ? 'Creating account…' : 'Sign up'}
-        </button>
-      </form>
+    <main className="container flex min-h-[70vh] items-center justify-center py-12">
+      <Card className="w-full max-w-md">
+        <CardHeader className="items-center text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <CarFront className="h-5 w-5" />
+          </span>
+          <CardTitle className="text-2xl">Create your CoRide account</CardTitle>
+          <CardDescription>Join CoRide to offer rides and manage your vehicles.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+          {success ? (
+            <Alert variant="success" role="status" className="mb-4">
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertDescription>{success}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            <Field label="Name" htmlFor="name" hint="Optional — this is how other riders see you.">
+              <Input id="name" name="name" type="text" autoComplete="name" />
+            </Field>
+            <Field label="Email" htmlFor="email" required>
+              <Input id="email" name="email" type="email" required autoComplete="email" />
+            </Field>
+            <Field
+              label="Password"
+              htmlFor="password"
+              required
+              hint="At least 8 characters."
+            >
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                minLength={8}
+                autoComplete="new-password"
+              />
+            </Field>
+            <Button type="submit" disabled={loading} className="w-full" size="lg">
+              {loading ? 'Creating account…' : 'Sign up'}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            Already have an account?{' '}
+            <Link
+              href="/login"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }
-
-const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '0.25rem' };
-
-const inputStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: '0.5rem',
-  boxSizing: 'border-box'
-};

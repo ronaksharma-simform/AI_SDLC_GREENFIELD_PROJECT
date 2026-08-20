@@ -2,6 +2,25 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select } from '@/components/ui/select';
+import { Field } from '@/components/field';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger
+} from '@/components/ui/alert-dialog';
 
 interface VehicleOption {
   id: string;
@@ -66,6 +85,7 @@ export function RideDetailForm({
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
 
   const cancelled = ride.status === 'CANCELLED' || ride.status === 'COMPLETED';
   const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
@@ -124,9 +144,7 @@ export function RideDetailForm({
   }
 
   async function handleCancel() {
-    if (!window.confirm('Cancel this ride? This cannot be undone.')) {
-      return;
-    }
+    setCancelOpen(false);
     setError(null);
     setSuccess(null);
     setCancelling(true);
@@ -156,93 +174,70 @@ export function RideDetailForm({
   }
 
   return (
-    <form onSubmit={handleSave} noValidate>
-      {error && (
-        <p role="alert" style={{ color: '#b00020' }}>
-          {error}
-        </p>
-      )}
-      {success && (
-        <p role="status" style={{ color: '#1e7d34' }}>
-          {success}
-        </p>
-      )}
+    <form onSubmit={handleSave} noValidate className="space-y-5">
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      {success ? (
+        <Alert variant="success" role="status">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      ) : null}
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="vehicleId" style={labelStyle}>
-          Vehicle
-        </label>
-        <select
+      <Field label="Vehicle" htmlFor="vehicleId" required errors={fieldErrors?.vehicleId}>
+        <Select
           id="vehicleId"
           name="vehicleId"
           required
           disabled={locked || cancelled}
           value={vehicleId}
           onChange={(event) => setVehicleId(event.target.value)}
-          style={inputStyle}
+          aria-invalid={fieldErrors?.vehicleId ? true : undefined}
         >
           {vehicles.map((vehicle) => (
             <option key={vehicle.id} value={vehicle.id}>
               {vehicle.label}
             </option>
           ))}
-        </select>
-        {fieldErrors?.vehicleId?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
+        </Select>
+      </Field>
+
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Source" htmlFor="source" required errors={fieldErrors?.source}>
+          <Input
+            id="source"
+            name="source"
+            type="text"
+            required
+            minLength={2}
+            disabled={cancelled}
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+            aria-invalid={fieldErrors?.source ? true : undefined}
+          />
+        </Field>
+
+        <Field label="Destination" htmlFor="destination" required errors={fieldErrors?.destination}>
+          <Input
+            id="destination"
+            name="destination"
+            type="text"
+            required
+            minLength={2}
+            disabled={cancelled}
+            value={destination}
+            onChange={(event) => setDestination(event.target.value)}
+            aria-invalid={fieldErrors?.destination ? true : undefined}
+          />
+        </Field>
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="source" style={labelStyle}>
-          Source
-        </label>
-        <input
-          id="source"
-          name="source"
-          type="text"
-          required
-          minLength={2}
-          disabled={cancelled}
-          value={source}
-          onChange={(event) => setSource(event.target.value)}
-          style={inputStyle}
-        />
-        {fieldErrors?.source?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="destination" style={labelStyle}>
-          Destination
-        </label>
-        <input
-          id="destination"
-          name="destination"
-          type="text"
-          required
-          minLength={2}
-          disabled={cancelled}
-          value={destination}
-          onChange={(event) => setDestination(event.target.value)}
-          style={inputStyle}
-        />
-        {fieldErrors?.destination?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="departureTime" style={labelStyle}>
-          Departure time
-        </label>
-        <input
+      <Field label="Departure time" htmlFor="departureTime" required errors={fieldErrors?.departureTime}>
+        <Input
           id="departureTime"
           name="departureTime"
           type="datetime-local"
@@ -250,20 +245,17 @@ export function RideDetailForm({
           disabled={locked || cancelled}
           value={departureTime}
           onChange={(event) => setDepartureTime(event.target.value)}
-          style={inputStyle}
+          aria-invalid={fieldErrors?.departureTime ? true : undefined}
         />
-        {fieldErrors?.departureTime?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
+      </Field>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="seatsTotal" style={labelStyle}>
-          Seats offered
-        </label>
-        <input
+      <Field
+        label="Seats offered"
+        htmlFor="seatsTotal"
+        required
+        errors={fieldErrors?.seatsTotal}
+      >
+        <Input
           id="seatsTotal"
           name="seatsTotal"
           type="number"
@@ -273,20 +265,17 @@ export function RideDetailForm({
           disabled={locked || cancelled}
           value={seatsTotal}
           onChange={(event) => setSeatsTotal(Number(event.target.value))}
-          style={inputStyle}
+          aria-invalid={fieldErrors?.seatsTotal ? true : undefined}
         />
-        {fieldErrors?.seatsTotal?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
+      </Field>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="notes" style={labelStyle}>
-          Notes (optional)
-        </label>
-        <textarea
+      <Field
+        label="Notes"
+        htmlFor="notes"
+        hint="Optional — e.g. meeting point, luggage rules."
+        errors={fieldErrors?.notes}
+      >
+        <Textarea
           id="notes"
           name="notes"
           rows={2}
@@ -294,42 +283,42 @@ export function RideDetailForm({
           disabled={cancelled}
           value={notes}
           onChange={(event) => setNotes(event.target.value)}
-          style={inputStyle}
+          aria-invalid={fieldErrors?.notes ? true : undefined}
         />
-        {fieldErrors?.notes?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
+      </Field>
+
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <Button type="submit" disabled={loading || cancelled} size="lg">
+          {loading ? 'Saving…' : 'Save changes'}
+        </Button>
+
+        {!cancelled ? (
+          <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="outline" size="lg" disabled={cancelling}>
+                {cancelling ? 'Cancelling…' : 'Cancel ride'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Cancel this ride?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This cannot be undone. Riders who have requested seats will be notified.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep ride</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleCancel}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  Cancel ride
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
       </div>
-
-      <button
-        type="submit"
-        disabled={loading || cancelled}
-        style={{ padding: '0.6rem 1.2rem', cursor: loading || cancelled ? 'not-allowed' : 'pointer', marginRight: '0.5rem' }}
-      >
-        {loading ? 'Saving…' : 'Save changes'}
-      </button>
-
-      {!cancelled && (
-        <button
-          type="button"
-          disabled={cancelling}
-          onClick={handleCancel}
-          style={{ padding: '0.6rem 1.2rem', cursor: cancelling ? 'wait' : 'pointer', color: '#b00020' }}
-        >
-          {cancelling ? 'Cancelling…' : 'Cancel ride'}
-        </button>
-      )}
     </form>
   );
 }
-
-const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '0.25rem' };
-
-const inputStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: '0.5rem',
-  boxSizing: 'border-box'
-};
