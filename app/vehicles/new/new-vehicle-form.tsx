@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { AlertCircle, CheckCircle2 } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Field } from '@/components/field';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface VehicleResponse {
   ok: boolean;
@@ -71,120 +78,124 @@ export function NewVehicleForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
-      {error && (
-        <p role="alert" style={{ color: '#b00020' }}>
-          {error}
-        </p>
-      )}
-      {success && (
-        <p role="status" style={{ color: '#1e7d34' }}>
-          {success}
-        </p>
-      )}
+    <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      {error ? (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      ) : null}
+      {success ? (
+        <Alert variant="success" role="status">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>{success}</AlertDescription>
+        </Alert>
+      ) : null}
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="make" style={labelStyle}>
-          Make
-        </label>
-        <input id="make" name="make" type="text" required autoComplete="off" style={inputStyle} />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Make" htmlFor="make" required errors={fieldErrors?.make}>
+          <Input
+            id="make"
+            name="make"
+            type="text"
+            required
+            autoComplete="off"
+            aria-invalid={fieldErrors?.make ? true : undefined}
+          />
+        </Field>
+
+        <Field label="Model" htmlFor="model" required errors={fieldErrors?.model}>
+          <Input
+            id="model"
+            name="model"
+            type="text"
+            required
+            autoComplete="off"
+            aria-invalid={fieldErrors?.model ? true : undefined}
+          />
+        </Field>
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="model" style={labelStyle}>
-          Model
-        </label>
-        <input id="model" name="model" type="text" required autoComplete="off" style={inputStyle} />
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field label="Year" htmlFor="year" required errors={fieldErrors?.year}>
+          <Input
+            id="year"
+            name="year"
+            type="number"
+            required
+            min={1900}
+            max={2100}
+            aria-invalid={fieldErrors?.year ? true : undefined}
+          />
+        </Field>
+
+        <Field label="Color" htmlFor="color" hint="Optional." errors={fieldErrors?.color}>
+          <Input
+            id="color"
+            name="color"
+            type="text"
+            autoComplete="off"
+            aria-invalid={fieldErrors?.color ? true : undefined}
+          />
+        </Field>
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="year" style={labelStyle}>
-          Year
-        </label>
-        <input id="year" name="year" type="number" required min={1900} max={2100} style={inputStyle} />
-      </div>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="color" style={labelStyle}>
-          Color
-        </label>
-        <input id="color" name="color" type="text" autoComplete="off" style={inputStyle} />
-      </div>
-
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="licensePlate" style={labelStyle}>
-          License plate
-        </label>
-        <input
+      <Field label="License plate" htmlFor="licensePlate" required errors={fieldErrors?.licensePlate}>
+        <Input
           id="licensePlate"
           name="licensePlate"
           type="text"
           required
           maxLength={20}
           autoComplete="off"
-          style={inputStyle}
+          aria-invalid={fieldErrors?.licensePlate ? true : undefined}
         />
-        {fieldErrors?.licensePlate?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
+      </Field>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="seatCapacity" style={labelStyle}>
-          Seat capacity
-        </label>
-        <input
-          id="seatCapacity"
-          name="seatCapacity"
-          type="number"
+      <div className="grid gap-5 sm:grid-cols-2">
+        <Field
+          label="Seat capacity"
+          htmlFor="seatCapacity"
           required
-          min={1}
-          max={8}
-          style={inputStyle}
-        />
-        {fieldErrors?.seatCapacity?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
+          errors={fieldErrors?.seatCapacity}
+        >
+          <Input
+            id="seatCapacity"
+            name="seatCapacity"
+            type="number"
+            required
+            min={1}
+            max={8}
+            aria-invalid={fieldErrors?.seatCapacity ? true : undefined}
+          />
+        </Field>
+
+        <Field label="Vehicle type" htmlFor="vehicleType" required errors={fieldErrors?.vehicleType}>
+          <Select
+            id="vehicleType"
+            name="vehicleType"
+            required
+            defaultValue="SEDAN"
+            aria-invalid={fieldErrors?.vehicleType ? true : undefined}
+          >
+            {VEHICLE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <label htmlFor="vehicleType" style={labelStyle}>
-          Vehicle type
-        </label>
-        <select id="vehicleType" name="vehicleType" required style={inputStyle}>
-          {VEHICLE_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
-            </option>
-          ))}
-        </select>
-        {fieldErrors?.vehicleType?.map((message) => (
-          <small key={message} style={{ color: '#b00020', display: 'block' }}>
-            {message}
-          </small>
-        ))}
-      </div>
-
-      <button type="submit" disabled={loading} style={{ padding: '0.6rem 1.2rem', cursor: loading ? 'wait' : 'pointer' }}>
+      <Button type="submit" disabled={loading} size="lg" className="w-full sm:w-auto">
         {loading ? 'Saving…' : 'Add vehicle'}
-      </button>
+      </Button>
 
-      <p style={{ marginTop: '1rem' }}>
-        <Link href="/dashboard">Back to dashboard</Link>
+      <p className="text-sm text-muted-foreground">
+        <Link href="/dashboard" className="text-primary underline-offset-4 hover:underline">
+          Back to dashboard
+        </Link>
       </p>
     </form>
   );
 }
-
-const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '0.25rem' };
-
-const inputStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: '0.5rem',
-  boxSizing: 'border-box'
-};

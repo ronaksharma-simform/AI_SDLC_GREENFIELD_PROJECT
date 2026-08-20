@@ -4,6 +4,13 @@ import { Suspense, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { AlertCircle, CarFront } from 'lucide-react';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Field } from '@/components/field';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 function LoginForm() {
   const router = useRouter();
@@ -44,40 +51,52 @@ function LoginForm() {
   }
 
   return (
-    <main style={{ maxWidth: 420, margin: '0 auto', padding: '2rem 1rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Sign in to CoRide</h1>
-      {error && (
-        <p role="alert" style={{ color: '#b00020' }}>
-          {error}
-        </p>
-      )}
-      <form onSubmit={handleSubmit} noValidate>
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="email" style={labelStyle}>
-            Email
-          </label>
-          <input id="email" name="email" type="email" required autoComplete="email" style={inputStyle} />
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label htmlFor="password" style={labelStyle}>
-            Password
-          </label>
-          <input
-            id="password"
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            style={inputStyle}
-          />
-        </div>
-        <button type="submit" disabled={loading} style={{ padding: '0.6rem 1.2rem', cursor: loading ? 'wait' : 'pointer' }}>
-          {loading ? 'Signing in…' : 'Sign in'}
-        </button>
-      </form>
-      <p style={{ marginTop: '1rem' }}>
-        No account? <Link href="/signup">Create one</Link>.
-      </p>
+    <main className="container flex min-h-[70vh] items-center justify-center py-12">
+      <Card className="w-full max-w-md">
+        <CardHeader className="items-center text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <CarFront className="h-5 w-5" />
+          </span>
+          <CardTitle className="text-2xl">Sign in to CoRide</CardTitle>
+          <CardDescription>Enter your email and password to continue.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error ? (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            <Field label="Email" htmlFor="email" required>
+              <Input id="email" name="email" type="email" required autoComplete="email" />
+            </Field>
+            <Field label="Password" htmlFor="password" required>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+              />
+            </Field>
+            <Button type="submit" disabled={loading} className="w-full" size="lg">
+              {loading ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            No account?{' '}
+            <Link
+              href="/signup"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Create one
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }
@@ -89,12 +108,3 @@ export default function LoginPage() {
     </Suspense>
   );
 }
-
-const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '0.25rem' };
-
-const inputStyle: React.CSSProperties = {
-  display: 'block',
-  width: '100%',
-  padding: '0.5rem',
-  boxSizing: 'border-box'
-};

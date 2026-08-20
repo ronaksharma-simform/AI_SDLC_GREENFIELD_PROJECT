@@ -1,18 +1,36 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { ArrowRight, CalendarClock, CarFront, Mail, Shield } from 'lucide-react';
+
 import { getSession } from '@/lib/auth';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const metadata = {
-  title: 'Dashboard | CoRide'
+  title: 'Dashboard'
 };
 
-/**
- * Protected dashboard page (AUTH-8).
- *
- * The root `middleware.ts` already gates `/dashboard` behind a valid JWT, but
- * this server-side check is defence in depth: if a session is somehow absent it
- * redirects to `/login` rather than rendering a broken page.
- */
+const QUICK_ACTIONS = [
+  {
+    href: '/rides',
+    title: 'My rides',
+    description: 'View, edit, or cancel the rides you have offered.',
+    icon: CalendarClock
+  },
+  {
+    href: '/rides/new',
+    title: 'Offer a ride',
+    description: 'Publish a new ride with one of your vehicles.',
+    icon: ArrowRight
+  },
+  {
+    href: '/vehicles/new',
+    title: 'Add a vehicle',
+    description: 'Register a vehicle so you can offer rides with it.',
+    icon: CarFront
+  }
+];
+
 export default async function DashboardPage() {
   const session = await getSession();
 
@@ -23,18 +41,73 @@ export default async function DashboardPage() {
   const { name, email, role } = session.user;
 
   return (
-    <main style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1rem', fontFamily: 'system-ui, sans-serif' }}>
-      <h1>Dashboard</h1>
-      <p>
-        Welcome, <strong>{name ?? email ?? 'rider'}</strong>!
-      </p>
-      <ul>
-        <li>Email: {email ?? '—'}</li>
-        <li>Role: {role ?? 'USER'}</li>
-      </ul>
-      <p>
-        <Link href="/">Back to home</Link>
-      </p>
+    <main className="container py-10">
+      <div className="mx-auto max-w-4xl space-y-8">
+        <header>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="mt-1 text-muted-foreground">
+            Welcome, <span className="font-medium text-foreground">{name ?? email ?? 'rider'}</span>!
+          </p>
+        </header>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-4 w-4 text-muted-foreground" />
+              Profile
+            </CardTitle>
+            <CardDescription>Your account details.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">Email</dt>
+                <dd className="mt-0.5 font-medium">{email ?? '—'}</dd>
+              </div>
+              <div>
+                <dt className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Shield className="h-3.5 w-3.5" />
+                  Role
+                </dt>
+                <dd className="mt-0.5 font-medium">{role ?? 'USER'}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <section aria-labelledby="quick-actions-heading">
+          <h2 id="quick-actions-heading" className="text-lg font-semibold">
+            Quick actions
+          </h2>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            {QUICK_ACTIONS.map((action) => (
+              <Card key={action.href} className="transition-shadow hover:shadow-md">
+                <CardContent className="flex flex-col items-start gap-3 p-5">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <action.icon className="h-5 w-5" />
+                  </span>
+                  <div>
+                    <h3 className="font-semibold">{action.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{action.description}</p>
+                  </div>
+                  <Button asChild variant="outline" size="sm" className="mt-1">
+                    <Link href={action.href}>
+                      Open
+                      <ArrowRight />
+                    </Link>
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </section>
+
+        <p className="text-sm text-muted-foreground">
+          <Link href="/" className="text-primary underline-offset-4 hover:underline">
+            Back to home
+          </Link>
+        </p>
+      </div>
     </main>
   );
 }
