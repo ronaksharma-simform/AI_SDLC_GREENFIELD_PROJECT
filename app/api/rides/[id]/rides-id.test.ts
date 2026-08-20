@@ -135,14 +135,15 @@ describe('GET /api/rides/{id}', () => {
     expect(body.error).toContain('not found');
   });
 
-  it('returns 404 (not 403) for a ride owned by another user', async () => {
+  it('returns the ride to an authenticated non-owner (discovery feed detail view)', async () => {
     mockRideFindUnique.mockResolvedValue({ ...baseRide, providerId: OTHER_USER_ID });
 
     const res = await GET(makeRequest(), params(RIDE_ID));
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toContain('not found');
+    expect(body.ok).toBe(true);
+    expect(body.ride.providerId).toBe(OTHER_USER_ID);
   });
 
   it('returns the ride for its owner', async () => {
