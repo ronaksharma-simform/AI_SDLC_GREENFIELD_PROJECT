@@ -222,3 +222,73 @@ export const rideUpdateSchema = z.object({
 });
 
 export type RideUpdateInput = z.infer<typeof rideUpdateSchema>;
+
+/**
+ * Zod schema for `POST /api/rides/{id}/requests`.
+ *
+ * - `seatsRequested` is coerced from a number or numeric string and must be a
+ *   positive integer. Whether it exceeds the ride's current availability is
+ *   checked in the route after the ride is loaded (REQ-19a).
+ * - `message` is optional, trimmed, and capped at 280 characters (matches the
+ *   `ride_requests.message` column).
+ */
+export const rideRequestCreateSchema = z.object({
+  seatsRequested: z.coerce
+    .number()
+    .int('Seats must be a whole number.')
+    .min(1, 'Seats must be at least 1.'),
+  message: z
+    .string()
+    .trim()
+    .max(RIDE_NOTES_MAX, `Message must be at most ${RIDE_NOTES_MAX} characters long.`)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined))
+});
+
+export type RideRequestCreateInput = z.infer<typeof rideRequestCreateSchema>;
+
+/** Default departure-time tolerance for the discovery feed (±30 minutes). */
+export const DEFAULT_FEED_TOLERANCE_MINUTES = 30;
+
+/**
+ * Zod schema for the query string of `GET /api/rides/feed`.
+ *
+ * Every filter is optional. When absent, no constraint is applied for that
+ * dimension.
+ *
+ * - `source` / `destination` are free-text route filters, matched
+ *   case-insensitively against the ride's stored addresses.
+ * - `time` must be a valid date/time. When provided, only rides whose departure
+ *   falls within `±toleranceMinutes` of that time are returned (REQ-13a).
+ * - `seats` must be a positive integer; only rides with at least that many
+ *   available seats are returned (REQ-13b).
+ * - `toleranceMinutes` configures the time window; defaults to 30 (REQ-13a).
+ */
+export const rideFeedQuerySchema = z.object({
+  source: z
+    .string()
+    .trim()
+    .min(1, 'Source must not be empty.')
+    .max(RIDE_ADDRESS_MAX, `Source must be at most ${RIDE_ADDRESS_MAX} characters long.`)
+    .optional(),
+  destination: z
+    .string()
+    .trim()
+    .min(1, 'Destination must not be empty.')
+    .max(RIDE_ADDRESS_MAX, `Destination must be at most ${RIDE_ADDRESS_MAX} characters long.`)
+    .optional(),
+  time: z.coerce.date().optional(),
+  seats: z.coerce
+    .number()
+    .int('Seats must be a whole number.')
+    .min(1, 'Seats must be at least 1.')
+    .optional(),
+  toleranceMinutes: z.coerce
+    .number()
+    .int('Tolerance must be a whole number of minutes.')
+    .min(0, 'Tolerance must be at least 0 minutes.')
+    .max(1440, 'Tolerance must be at most 1440 minutes.')
+    .optional()
+});
+
+export type RideFeedQueryInput = z.infer<typeof rideFeedQuerySchema>;

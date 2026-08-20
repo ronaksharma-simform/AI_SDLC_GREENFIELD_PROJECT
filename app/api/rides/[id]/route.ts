@@ -24,15 +24,16 @@ async function getOwnedRide(id: string, userId: string) {
 /**
  * GET /api/rides/{id}
  *
- * Returns a single ride, but only to its owner. A ride that does not exist and
- * a ride that belongs to someone else both resolve to the same 404 so we never
- * confirm the existence of another user's ride (Section 10 — Access Control).
+ * Returns a single ride's full details. Since the Ride Discovery Feed module
+ * (REQ-9 / REQ-11, section 6.2) lets a Seeker open a ride they found in the
+ * feed, any authenticated user may view any existing ride. A ride that does
+ * not exist resolves to 404.
  *
  * Responses:
  *   - 200 { ok: true, ride }       on success
  *   - 400 { ok: false, error }     malformed ride id
  *   - 401 { ok: false, error }     no valid session
- *   - 404 { ok: false, error }     ride not found / not owned by the caller
+ *   - 404 { ok: false, error }     ride not found
  *   - 500 { ok: false, error }     unexpected failure
  */
 export async function GET(_request: Request, { params }: RouteContext) {
@@ -48,10 +49,19 @@ export async function GET(_request: Request, { params }: RouteContext) {
   }
 
   try {
-    const result = await getOwnedRide(id, session.user.id);
-    if ('error' in result) return result.error;
+    const ride = await prisma.ride.findUnique({
+      where: { id },
+      include: {
+        vehicle: true,
+        provider: { select: { id: true, name: true, email: true } }
+      }
+    });
 
-    return NextResponse.json({ ok: true, ride: result.ride });
+    if (!ride) {
+      return Response.json({ ok: false, error: 'Ride not found.' }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true, ride });
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Ride fetch failed:', error);

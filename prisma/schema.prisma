@@ -37,6 +37,13 @@ enum RideStatus {
   COMPLETED
 }
 
+enum RideRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -47,6 +54,7 @@ model User {
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   vehicles     Vehicle[]
   rides        Ride[]
+  rideRequests RideRequest[]
 
   @@map("users")
 }
@@ -91,8 +99,28 @@ model Ride {
 
   provider User    @relation(fields: [providerId], references: [id], onDelete: Cascade)
   vehicle  Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  requests RideRequest[]
 
   @@index([providerId])
   @@index([vehicleId])
   @@map("rides")
+}
+
+model RideRequest {
+  id             String            @id @default(uuid()) @db.Uuid
+  rideId         String            @map("ride_id") @db.Uuid
+  seekerId       String            @map("seeker_id") @db.Uuid
+  seatsRequested Int               @map("seats_requested")
+  status         RideRequestStatus @default(PENDING)
+  message        String?           @db.VarChar(280)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  respondedAt    DateTime?         @map("responded_at") @db.Timestamptz(6)
+
+  ride   Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  seeker User @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+
+  @@index([rideId])
+  @@index([seekerId])
+  @@index([rideId, seekerId, status])
+  @@map("ride_requests")
 }
