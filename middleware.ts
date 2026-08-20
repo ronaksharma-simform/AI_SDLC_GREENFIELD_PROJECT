@@ -1,4 +1,5 @@
 import { withAuth } from 'next-auth/middleware';
+import { authSecret } from '@/lib/auth-secret';
 
 /**
  * Protects the authenticated areas of the app.
@@ -12,6 +13,7 @@ import { withAuth } from 'next-auth/middleware';
  * down as soon as it exists.
  */
 export default withAuth({
+  secret: authSecret,
   pages: {
     signIn: '/login'
   }

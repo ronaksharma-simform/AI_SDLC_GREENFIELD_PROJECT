@@ -4,6 +4,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { loginSchema } from '@/lib/validation';
+import { authSecret } from '@/lib/auth-secret';
 
 /**
  * NextAuth configuration for CoRide.
@@ -17,12 +18,13 @@ import { loginSchema } from '@/lib/validation';
  * failure `authorize` returns `null`, which NextAuth turns into a failed login
  * (the `/login` page then surfaces a generic "invalid credentials" error).
  *
- * NOTE: `NEXTAUTH_SECRET` must be set in production (NextAuth derives a
- * development-only secret when it is absent). It is loaded from the project
- * `.env` file by `@/lib/prisma` before this module reads `process.env`.
+ * NOTE: `NEXTAUTH_SECRET` should be set in production. When it is absent we
+ * fall back to a shared deterministic secret (`@/lib/auth-secret`) so protected
+ * routes keep working in local/demo deployments and CI. The middleware uses the
+ * same shared secret so it can verify the session JWT.
  */
 export const authOptions: NextAuthOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: authSecret,
   session: { strategy: 'jwt' },
   pages: { signIn: '/login' },
   providers: [
