@@ -55,12 +55,19 @@ const vehicle = {
 
 const FUTURE_ISO = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
+const sourceLocation = { latitude: 40.7128, longitude: -74.006, address: 'Downtown', placeId: 's-1' };
+const destinationLocation = { latitude: 40.6893, longitude: -74.0445, address: 'Airport', placeId: 'd-1' };
+
 const createdRide = {
   id: '1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d',
   providerId: PROVIDER_ID,
   vehicleId: vehicle.id,
-  source: 'Downtown',
-  destination: 'Airport',
+  sourceLatitude: '40.712800',
+  sourceLongitude: '-74.006000',
+  sourceAddress: 'Downtown',
+  destinationLatitude: '40.689300',
+  destinationLongitude: '-74.044500',
+  destinationAddress: 'Airport',
   departureTime: FUTURE_ISO,
   seatsTotal: 3,
   seatsAvailable: 3,
@@ -85,8 +92,8 @@ function makeRequest(body?: string, method = 'POST'): Request {
 
 const validBody = {
   vehicleId: vehicle.id,
-  source: 'Downtown',
-  destination: 'Airport',
+  source: sourceLocation,
+  destination: destinationLocation,
   departureTime: FUTURE_ISO,
   seatsTotal: 3
 };
@@ -124,12 +131,17 @@ describe('POST /api/rides', () => {
 
     // providerId always comes from the session; seatsAvailable starts equal to
     // seatsTotal; status starts ACTIVE; the vehicle is included in the response.
+    // Coordinates + address are persisted for both source and destination.
     expect(mockRideCreate).toHaveBeenCalledWith({
       data: {
         providerId: PROVIDER_ID,
         vehicleId: vehicle.id,
-        source: 'Downtown',
-        destination: 'Airport',
+        sourceLatitude: 40.7128,
+        sourceLongitude: -74.006,
+        sourceAddress: 'Downtown',
+        destinationLatitude: 40.6893,
+        destinationLongitude: -74.0445,
+        destinationAddress: 'Airport',
         departureTime: new Date(FUTURE_ISO),
         seatsTotal: 3,
         seatsAvailable: 3,
@@ -188,13 +200,43 @@ describe('POST /api/rides', () => {
     expect(mockRideCreate).not.toHaveBeenCalled();
   });
 
-  it('returns 400 when source is shorter than 2 characters', async () => {
-    const res = await POST(makeRequest(JSON.stringify({ ...validBody, source: 'X' })));
+  it('returns 400 when the source address is shorter than 2 characters', async () => {
+    const res = await POST(
+      makeRequest(JSON.stringify({ ...validBody, source: { ...sourceLocation, address: 'X' } }))
+    );
 
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.ok).toBe(false);
-    expect(body.details.source[0]).toContain('at least 2');
+    expect(body.details.source.some((message: string) => message.includes('at least 2'))).toBe(true);
+    expect(mockRideCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when the source latitude is out of range', async () => {
+    const res = await POST(
+      makeRequest(
+        JSON.stringify({ ...validBody, source: { ...sourceLocation, latitude: 100 } })
+      )
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.details.source.some((message: string) => message.includes('-90'))).toBe(true);
+    expect(mockRideCreate).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when source and destination resolve to the same point', async () => {
+    const res = await POST(
+      makeRequest(
+        JSON.stringify({ ...validBody, destination: { ...sourceLocation, address: 'Also Downtown' } })
+      )
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.ok).toBe(false);
+    expect(body.error).toContain('different locations');
     expect(mockRideCreate).not.toHaveBeenCalled();
   });
 

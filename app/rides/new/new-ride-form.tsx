@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select } from '@/components/ui/select';
 import { Field } from '@/components/field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { LocationPicker, type LocationValue } from '@/components/location-picker';
 
 interface VehicleOption {
   id: string;
@@ -18,16 +19,29 @@ interface VehicleOption {
 
 interface RideResponse {
   ok: boolean;
-  ride?: { id: string; source: string; destination: string };
+  ride?: { id: string; sourceAddress: string; destinationAddress: string };
   error?: string;
   message?: string;
   details?: Record<string, string[]>;
+}
+
+function toLocationPayload(location: LocationValue | null) {
+  if (!location) return null;
+  return {
+    latitude: location.latitude,
+    longitude: location.longitude,
+    address: location.address,
+    ...(location.placeId ? { placeId: location.placeId } : {})
+  };
 }
 
 export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
   const firstVehicle = vehicles[0];
   const [vehicleId, setVehicleId] = useState(firstVehicle?.id ?? '');
   const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId) ?? firstVehicle;
+
+  const [source, setSource] = useState<LocationValue | null>(null);
+  const [destination, setDestination] = useState<LocationValue | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
@@ -46,8 +60,8 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
 
     const payload = {
       vehicleId: String(formData.get('vehicleId') ?? ''),
-      source: String(formData.get('source') ?? '').trim(),
-      destination: String(formData.get('destination') ?? '').trim(),
+      source: toLocationPayload(source),
+      destination: toLocationPayload(destination),
       departureTime: String(formData.get('departureTime') ?? ''),
       seatsTotal: Number(formData.get('seatsTotal')),
       notes: String(formData.get('notes') ?? '').trim() || undefined
@@ -68,9 +82,11 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
       const body: RideResponse = await res.json();
       if (res.ok && body.ok) {
         setSuccess(
-          `Ride from ${body.ride?.source ?? ''} to ${body.ride?.destination ?? ''} was published.`
+          `Ride from ${body.ride?.sourceAddress ?? ''} to ${body.ride?.destinationAddress ?? ''} was published.`
         );
         form.reset();
+        setSource(null);
+        setDestination(null);
       } else if (res.status === 400 && body.details) {
         setFieldErrors(body.details);
         setError(body.error ?? 'Please fix the highlighted fields.');
@@ -116,31 +132,23 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
         </Select>
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Source" htmlFor="source" required errors={fieldErrors?.source}>
-          <Input
-            id="source"
-            name="source"
-            type="text"
-            required
-            minLength={2}
-            autoComplete="off"
-            aria-invalid={fieldErrors?.source ? true : undefined}
-          />
-        </Field>
+      <LocationPicker
+        id="source"
+        label="Source"
+        value={source}
+        onChange={setSource}
+        errors={fieldErrors?.source}
+        hint="Pick up location"
+      />
 
-        <Field label="Destination" htmlFor="destination" required errors={fieldErrors?.destination}>
-          <Input
-            id="destination"
-            name="destination"
-            type="text"
-            required
-            minLength={2}
-            autoComplete="off"
-            aria-invalid={fieldErrors?.destination ? true : undefined}
-          />
-        </Field>
-      </div>
+      <LocationPicker
+        id="destination"
+        label="Destination"
+        value={destination}
+        onChange={setDestination}
+        errors={fieldErrors?.destination}
+        hint="Drop off location"
+      />
 
       <Field label="Departure time" htmlFor="departureTime" required errors={fieldErrors?.departureTime}>
         <Input

@@ -55,12 +55,19 @@ const vehicle = {
 
 const FUTURE_ISO = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
+const sourceLocation = { latitude: 40.7128, longitude: -74.006, address: 'Downtown', placeId: 's-1' };
+const destinationLocation = { latitude: 40.6893, longitude: -74.0445, address: 'Airport', placeId: 'd-1' };
+
 const baseRide = {
   id: RIDE_ID,
   providerId: PROVIDER_ID,
   vehicleId: vehicle.id,
-  source: 'Downtown',
-  destination: 'Airport',
+  sourceLatitude: '40.712800',
+  sourceLongitude: '-74.006000',
+  sourceAddress: 'Downtown',
+  destinationLatitude: '40.689300',
+  destinationLongitude: '-74.044500',
+  destinationAddress: 'Airport',
   departureTime: FUTURE_ISO,
   seatsTotal: 4,
   seatsAvailable: 4,
@@ -205,11 +212,17 @@ describe('PATCH /api/rides/{id}', () => {
   it('returns 400 when a field fails validation', async () => {
     mockRideFindUnique.mockResolvedValue(currentRide);
 
-    const res = await PATCH(makeRequest(JSON.stringify({ source: 'X' }), 'PATCH'), params(RIDE_ID));
+    const res = await PATCH(
+      makeRequest(
+        JSON.stringify({ source: { latitude: 1, longitude: 1, address: 'X' } }),
+        'PATCH'
+      ),
+      params(RIDE_ID)
+    );
 
     expect(res.status).toBe(400);
     const body = await res.json();
-    expect(body.details.source[0]).toContain('at least 2');
+    expect(body.details.source.some((message: string) => message.includes('at least 2'))).toBe(true);
     expect(mockRideUpdate).not.toHaveBeenCalled();
   });
 
@@ -232,13 +245,32 @@ describe('PATCH /api/rides/{id}', () => {
 
   it('allows non-core fields (source/destination) when locked', async () => {
     mockRideFindUnique.mockResolvedValue(lockedRide);
-    mockRideUpdate.mockResolvedValue({ ...lockedRide, source: 'Uptown' });
+    mockRideUpdate.mockResolvedValue({
+      ...lockedRide,
+      sourceLatitude: '40.730600',
+      sourceLongitude: '-73.986700',
+      sourceAddress: 'Uptown'
+    });
 
-    const res = await PATCH(makeRequest(JSON.stringify({ source: 'Uptown' }), 'PATCH'), params(RIDE_ID));
+    const res = await PATCH(
+      makeRequest(
+        JSON.stringify({
+          source: { latitude: 40.7306, longitude: -73.9867, address: 'Uptown' }
+        }),
+        'PATCH'
+      ),
+      params(RIDE_ID)
+    );
 
     expect(res.status).toBe(200);
     expect(mockRideUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ source: 'Uptown' }) })
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sourceLatitude: 40.7306,
+          sourceLongitude: -73.9867,
+          sourceAddress: 'Uptown'
+        })
+      })
     );
   });
 
@@ -303,12 +335,25 @@ describe('PATCH /api/rides/{id}', () => {
   it('applies a full edit (vehicle + seats + fields) when unlocked', async () => {
     mockRideFindUnique.mockResolvedValue(currentRide);
     mockVehicleFindUnique.mockResolvedValue(newVehicle);
-    const updated = { ...currentRide, vehicleId: newVehicle.id, source: 'Uptown', seatsTotal: 5, seatsAvailable: 5, notes: null };
+    const updated = {
+      ...currentRide,
+      vehicleId: newVehicle.id,
+      sourceLatitude: '40.730600',
+      sourceLongitude: '-73.986700',
+      sourceAddress: 'Uptown',
+      seatsTotal: 5,
+      seatsAvailable: 5,
+      notes: null
+    };
     mockRideUpdate.mockResolvedValue(updated);
 
     const res = await PATCH(
       makeRequest(
-        JSON.stringify({ vehicleId: newVehicle.id, source: 'Uptown', seatsTotal: 5 }),
+        JSON.stringify({
+          vehicleId: newVehicle.id,
+          source: { latitude: 40.7306, longitude: -73.9867, address: 'Uptown' },
+          seatsTotal: 5
+        }),
         'PATCH'
       ),
       params(RIDE_ID)
@@ -319,12 +364,62 @@ describe('PATCH /api/rides/{id}', () => {
       where: { id: RIDE_ID },
       data: {
         vehicleId: newVehicle.id,
-        source: 'Uptown',
+        sourceLatitude: 40.7306,
+        sourceLongitude: -73.9867,
+        sourceAddress: 'Uptown',
         seatsTotal: 5,
         seatsAvailable: 5
       },
       include: { vehicle: true }
     });
+  });
+
+  it('allows editing a legacy ride that has no stored coordinates', async () => {
+    const legacyRide = {
+      ...baseRide,
+      sourceLatitude: null,
+      sourceLongitude: null,
+      destinationLatitude: null,
+      destinationLongitude: null
+    };
+    mockRideFindUnique.mockResolvedValue(legacyRide);
+    const updated = { ...legacyRide, notes: 'Updated legacy note' };
+    mockRideUpdate.mockResolvedValue(updated);
+
+    const res = await PATCH(
+      makeRequest(JSON.stringify({ notes: 'Updated legacy note' }), 'PATCH'),
+      params(RIDE_ID)
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRideUpdate).toHaveBeenCalledWith({
+      where: { id: RIDE_ID },
+      data: { notes: 'Updated legacy note' },
+      include: { vehicle: true }
+    });
+  });
+
+  it('returns 400 when the edit makes source and destination resolve to the same point', async () => {
+    mockRideFindUnique.mockResolvedValue(currentRide);
+
+    const res = await PATCH(
+      makeRequest(
+        JSON.stringify({
+          destination: {
+            latitude: 40.7128,
+            longitude: -74.006,
+            address: 'Also Downtown'
+          }
+        }),
+        'PATCH'
+      ),
+      params(RIDE_ID)
+    );
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toContain('different locations');
+    expect(mockRideUpdate).not.toHaveBeenCalled();
   });
 
   it('returns 500 for an unexpected database error', async () => {

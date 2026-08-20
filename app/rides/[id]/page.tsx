@@ -72,7 +72,8 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
         <Card>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2">
-              {ride.source} <span className="text-muted-foreground">&rarr;</span> {ride.destination}
+              {ride.sourceAddress} <span className="text-muted-foreground">&rarr;</span>{' '}
+              {ride.destinationAddress}
               <Badge variant={statusBadgeVariant(ride.status)}>
                 {STATUS_LABELS[ride.status] ?? ride.status}
               </Badge>
@@ -120,8 +121,12 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
             <RideDetailForm
               ride={{
                 id: ride.id,
-                source: ride.source,
-                destination: ride.destination,
+                sourceLatitude: ride.sourceLatitude?.toString(),
+                sourceLongitude: ride.sourceLongitude?.toString(),
+                sourceAddress: ride.sourceAddress,
+                destinationLatitude: ride.destinationLatitude?.toString(),
+                destinationLongitude: ride.destinationLongitude?.toString(),
+                destinationAddress: ride.destinationAddress,
                 departureTime: ride.departureTime.toISOString(),
                 seatsTotal: ride.seatsTotal,
                 seatsAvailable: ride.seatsAvailable,

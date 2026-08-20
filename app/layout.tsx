@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 
 import '@/app/globals.css';
+// Leaflet's CSS is required for the location-picker map to lay out correctly.
+// Imported globally because Next.js only bundles global stylesheet imports.
+import 'leaflet/dist/leaflet.css';
 import { ThemeProvider } from '@/components/providers';
 import { SiteHeader } from '@/components/site-header';
 import { SiteFooter } from '@/components/site-footer';

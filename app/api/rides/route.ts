@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { rideCreateSchema } from '@/lib/validation';
+import { areLocationsTooClose } from '@/lib/rides';
 
 /**
  * GET /api/rides
@@ -46,14 +47,17 @@ export async function GET() {
  * (REQ-7) and the departure time must be in the future (REQ-6).
  *
  * Accepts a JSON body:
- *   { "vehicleId": uuid, "source": string, "destination": string,
+ *   { "vehicleId": uuid,
+ *     "source": { "latitude": number, "longitude": number, "address": string, "placeId"?: string },
+ *     "destination": { "latitude": number, "longitude": number, "address": string, "placeId"?: string },
  *     "departureTime": date, "seatsTotal": number (1..capacity), "notes"?: string }
  *
  * Responses:
  *   - 201 { ok: true, ride }       on success (ride includes its vehicle)
- *   - 400 { ok: false, error, details? }  malformed JSON, failed validation, or an
- *                                      unusable vehicle (not found / not owned /
- *                                      seats exceed capacity)
+ *   - 400 { ok: false, error, details? }  malformed JSON, failed validation, source
+ *                                      and destination too close, or an unusable
+ *                                      vehicle (not found / not owned / seats
+ *                                      exceed capacity)
  *   - 401 { ok: false, error }     no valid session
  *   - 500 { ok: false, error }     unexpected failure
  */
@@ -96,6 +100,15 @@ export async function POST(request: Request) {
 
   const { vehicleId, source, destination, departureTime, seatsTotal, notes } = parsed.data;
 
+  // Section 8 — Validation Rules: a ride's source and destination must not
+  // resolve to the same (or a negligibly close) point.
+  if (areLocationsTooClose(source, destination)) {
+    return Response.json(
+      { ok: false, error: 'Source and destination must be different locations.' },
+      { status: 400 }
+    );
+  }
+
   try {
     // Never trust a client-submitted vehicle reference: re-verify ownership now.
     const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
@@ -128,8 +141,12 @@ export async function POST(request: Request) {
       data: {
         providerId: session.user.id,
         vehicleId,
-        source,
-        destination,
+        sourceLatitude: source.latitude,
+        sourceLongitude: source.longitude,
+        sourceAddress: source.address,
+        destinationLatitude: destination.latitude,
+        destinationLongitude: destination.longitude,
+        destinationAddress: destination.address,
         departureTime,
         seatsTotal,
         seatsAvailable: seatsTotal,
