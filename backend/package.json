@@ -2,17 +2,29 @@
   "name": "@coride/backend",
   "private": true,
   "version": "0.1.0",
-  "description": "CoRide backend API (Express + PostgreSQL, TypeScript strict mode)",
-  "main": "dist/config.js",
+  "description": "CoRide backend API (Express + TypeScript strict mode)",
+  "main": "dist/main.js",
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "start": "tsc && node dist/main.js",
+    "dev": "tsc && node dist/main.js",
+    "test": "jest"
   },
   "dependencies": {
-    "dotenv": "^16.4.5"
+    "cookie-parser": "^1.4.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.7",
+    "@types/express": "^4.17.21",
+    "@types/jest": "^29.5.12",
     "@types/node": "^20.14.9",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.4",
     "typescript": "^5.5.4"
   }
 }
