@@ -1,114 +1,121 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Hoisted so the vi.mock factories can reference them (vitest hoists the mock
-// calls above imports; vi.hoisted avoids temporal-dead-zone surprises).
-const { mockCompare, mockFindUnique } = vi.hoisted(() => ({
-  mockCompare: vi.fn(),
-  mockFindUnique: vi.fn()
+const { mockCookies, mockRefreshFindUnique } = vi.hoisted(() => ({
+  mockCookies: vi.fn(),
+  mockRefreshFindUnique: vi.fn()
 }));
 
-vi.mock('bcryptjs', () => ({
-  __esModule: true,
-  default: { compare: mockCompare }
+vi.mock('next/headers', () => ({
+  cookies: mockCookies
 }));
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    user: {
-      findUnique: mockFindUnique
-    }
+    refreshToken: { findUnique: mockRefreshFindUnique }
   }
 }));
 
-// Return the provider options object unchanged so we can reach `authorize`
-// directly in the tests (the real CredentialsProvider wraps it with NextAuth
-// plumbing we do not exercise here).
-vi.mock('next-auth/providers/credentials', () => ({
-  __esModule: true,
-  default: (options: unknown) => options
-}));
+import { getSession, hasValidRefreshToken } from '@/lib/auth';
+import {
+  signAccessToken,
+  generateRefreshToken,
+  hashRefreshToken,
+  ACCESS_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE
+} from '@/lib/tokens';
 
-import { authOptions } from '@/lib/auth';
-
-const dbUser = {
-  id: '9b2f2f9e-2f2f-4f2f-9f2f-2f2f2f2f2f2f',
+const user = {
+  id: 'user-1',
   email: 'driver@example.com',
-  passwordHash: '$2a$12$abcdefghijklmnopqrstuv',
   name: 'Ada',
   role: 'DRIVER'
 };
 
-type CredentialsProviderConfig = {
-  authorize?: (credentials?: unknown) => Promise<unknown>;
-};
+function cookieStore(entries: Record<string, string>) {
+  return {
+    get: (name: string) => (entries[name] !== undefined ? { name, value: entries[name] } : undefined)
+  };
+}
 
-const authorize = (authOptions.providers[0] as CredentialsProviderConfig).authorize!;
-
-describe('authOptions (NextAuth credentials + JWT session)', () => {
+describe('getSession (server-component access-token check)', () => {
   beforeEach(() => {
-    mockCompare.mockReset();
-    mockFindUnique.mockReset();
+    mockCookies.mockReset();
+    mockRefreshFindUnique.mockReset();
   });
 
-  it('configures the JWT session strategy and the /login sign-in page', () => {
-    expect(authOptions.session?.strategy).toBe('jwt');
-    expect(authOptions.pages?.signIn).toBe('/login');
+  it('returns the user for a valid access token', async () => {
+    const access = await signAccessToken(user);
+    mockCookies.mockResolvedValue(cookieStore({ [ACCESS_TOKEN_COOKIE]: access }));
+
+    await expect(getSession()).resolves.toEqual(user);
   });
 
-  it('registers a credentials provider with an authorize function', () => {
-    expect(authOptions.providers).toHaveLength(1);
-    expect(typeof authorize).toBe('function');
+  it('returns null when no access token is present', async () => {
+    mockCookies.mockResolvedValue(cookieStore({}));
+
+    await expect(getSession()).resolves.toBeNull();
   });
 
-  it('authorize returns the user (without the password hash) for valid credentials', async () => {
-    mockFindUnique.mockResolvedValue(dbUser);
-    mockCompare.mockResolvedValue(true);
+  it('returns null for an invalid access token', async () => {
+    mockCookies.mockResolvedValue(cookieStore({ [ACCESS_TOKEN_COOKIE]: 'not-a-jwt' }));
 
-    const user = await authorize({ email: 'Driver@Example.com ', password: 'password123' });
+    await expect(getSession()).resolves.toBeNull();
+  });
+});
 
-    expect(user).toEqual({
-      id: dbUser.id,
-      email: dbUser.email,
-      name: dbUser.name,
-      role: dbUser.role
+describe('hasValidRefreshToken (page-guard refreshable check)', () => {
+  const activeRecord = {
+    id: 'rt-1',
+    userId: user.id,
+    tokenHash: 'h',
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    revokedAt: null,
+    replacedByTokenId: null,
+    createdAt: new Date(),
+    userAgent: null
+  };
+
+  beforeEach(() => {
+    mockCookies.mockReset();
+    mockRefreshFindUnique.mockReset();
+  });
+
+  it('returns true when a valid, unrotated refresh token exists', async () => {
+    const refresh = generateRefreshToken();
+    mockCookies.mockResolvedValue(cookieStore({ [REFRESH_TOKEN_COOKIE]: refresh }));
+    mockRefreshFindUnique.mockResolvedValue(activeRecord);
+
+    await expect(hasValidRefreshToken()).resolves.toBe(true);
+    expect(mockRefreshFindUnique).toHaveBeenCalledWith({
+      where: { tokenHash: await hashRefreshToken(refresh) }
     });
-    // Email is canonicalised before the lookup; password is compared via bcrypt.
-    expect(mockFindUnique).toHaveBeenCalledWith({ where: { email: 'driver@example.com' } });
-    expect(mockCompare).toHaveBeenCalledWith('password123', dbUser.passwordHash);
   });
 
-  it('authorize returns null when the password does not match', async () => {
-    mockFindUnique.mockResolvedValue(dbUser);
-    mockCompare.mockResolvedValue(false);
+  it('returns false when the refresh token was already rotated', async () => {
+    mockCookies.mockResolvedValue(cookieStore({ [REFRESH_TOKEN_COOKIE]: 't' }));
+    mockRefreshFindUnique.mockResolvedValue({ ...activeRecord, revokedAt: new Date(), replacedByTokenId: 'rt-next' });
 
-    await expect(authorize({ email: 'driver@example.com', password: 'wrong' })).resolves.toBeNull();
+    await expect(hasValidRefreshToken()).resolves.toBe(false);
   });
 
-  it('authorize returns null when no user exists for the email', async () => {
-    mockFindUnique.mockResolvedValue(null);
+  it('returns false when the refresh token is expired', async () => {
+    mockCookies.mockResolvedValue(cookieStore({ [REFRESH_TOKEN_COOKIE]: 't' }));
+    mockRefreshFindUnique.mockResolvedValue({ ...activeRecord, expiresAt: new Date(Date.now() - 1000) });
 
-    await expect(authorize({ email: 'ghost@example.com', password: 'password123' })).resolves.toBeNull();
-    expect(mockCompare).not.toHaveBeenCalled();
+    await expect(hasValidRefreshToken()).resolves.toBe(false);
   });
 
-  it('authorize returns null for invalid credentials input', async () => {
-    await expect(authorize({ email: 'not-an-email', password: 'password123' })).resolves.toBeNull();
-    expect(mockFindUnique).not.toHaveBeenCalled();
+  it('returns false when no refresh record exists', async () => {
+    mockCookies.mockResolvedValue(cookieStore({ [REFRESH_TOKEN_COOKIE]: 't' }));
+    mockRefreshFindUnique.mockResolvedValue(null);
+
+    await expect(hasValidRefreshToken()).resolves.toBe(false);
   });
 
-  it('jwt callback stores the user id and role on the token', async () => {
-    const callback = authOptions.callbacks?.jwt;
-    const token = await callback?.({ token: {}, user: { id: dbUser.id, role: 'DRIVER' } });
+  it('returns false when no refresh cookie is present', async () => {
+    mockCookies.mockResolvedValue(cookieStore({}));
 
-    expect(token?.id).toBe(dbUser.id);
-    expect(token?.role).toBe('DRIVER');
-  });
-
-  it('session callback exposes id and role from the token', async () => {
-    const callback = authOptions.callbacks?.session;
-    const session = await callback?.({ session: { user: {} }, token: { id: dbUser.id, role: 'DRIVER' } });
-
-    expect(session?.user?.id).toBe(dbUser.id);
-    expect(session?.user?.role).toBe('DRIVER');
+    await expect(hasValidRefreshToken()).resolves.toBe(false);
+    expect(mockRefreshFindUnique).not.toHaveBeenCalled();
   });
 });

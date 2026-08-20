@@ -1,15 +1,17 @@
 /**
- * Shared NextAuth secret used by both the server (getServerSession / authOptions)
- * and the Edge middleware (withAuth) so the session JWT is signed and verified
- * with the same key.
+ * Shared secret used to sign access-token JWTs (HS256) and verify them in the
+ * Edge middleware and on the server.
  *
- * `NEXTAUTH_SECRET` takes precedence when set. The fallback is deterministic so
- * the app still works in local/demo deployments and in CI where the variable is
- * not configured — without it, NextAuth v4 refuses to run in production mode and
- * every protected page redirects to `/api/auth/error?error=Configuration`.
+ * `SESSION_SECRET` takes precedence, with `NEXTAUTH_SECRET` accepted as a
+ * legacy fallback for deployments that set it before the two-token session
+ * model replaced NextAuth. The final fallback is deterministic so the app
+ * still works in local/demo deployments and in CI where neither variable is
+ * configured.
  *
  * NOTE: the fallback is NOT a production-grade secret. Deployments must set
- * `NEXTAUTH_SECRET` to a strong random value.
+ * `SESSION_SECRET` (or `NEXTAUTH_SECRET`) to a strong random value.
  */
 export const authSecret =
-  process.env.NEXTAUTH_SECRET ?? 'coride-dev-only-secret-change-before-production';
+  process.env.SESSION_SECRET ??
+  process.env.NEXTAUTH_SECRET ??
+  'coride-dev-only-secret-change-before-production';

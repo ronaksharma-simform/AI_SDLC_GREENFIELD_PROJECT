@@ -1,27 +1,56 @@
-import { withAuth } from 'next-auth/middleware';
-import { authSecret } from '@/lib/auth-secret';
+import { NextResponse, type NextRequest } from 'next/server';
+import { verifyAccessToken, ACCESS_TOKEN_COOKIE } from '@/lib/tokens';
 
 /**
- * Protects the authenticated areas of the app.
+ * Protects the authenticated areas of the app and keeps authenticated users
+ * away from the auth pages.
  *
- * `withAuth` redirects unauthenticated visitors to the configured sign-in page
- * (`/login`) and carries the original destination through as `callbackUrl` so
- * the login page can send them back afterwards.
+ * Access-token logic (REQ-11 / REQ-12):
+ *   - If the `access_token` cookie is present AND its signature/expiry verify:
+ *       - `/login` and `/signup` are redirected straight to `/dashboard` — the
+ *         auth form is never shown to a signed-in user.
+ *       - `/dashboard` (protected) is allowed through.
+ *   - Otherwise (no access token, or it expired / failed verification):
+ *       - `/dashboard` is redirected to `/login`, carrying the original
+ *         destination as `callbackUrl` so the user lands back on it after
+ *         signing in.
+ *       - `/login` / `/signup` render normally (the page's own server-side
+ *         guard handles the case where only a refresh token remains).
  *
- * The matcher keeps the middleware off public pages and static assets.
- *
- * `/vehicles/new` is intentionally public so the form can render; vehicle
- * creation itself is gated by `POST /api/vehicles`, which returns 401 without
- * a valid session. Any future `/vehicles` pages that must be private should be
- * added back to the matcher.
+ * The refresh-token-only case (expired access token + valid refresh cookie)
+ * cannot be resolved here because the Edge runtime has no database access; the
+ * login page guard silently renews those sessions server-side and sends them
+ * on to the dashboard.
  */
-export default withAuth({
-  secret: authSecret,
-  pages: {
-    signIn: '/login'
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const accessToken = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
+  const isAuthenticated = accessToken ? (await verifyAccessToken(accessToken)) !== null : false;
+
+  const isAuthPage = pathname === '/login' || pathname === '/signup';
+  const isProtected = pathname === '/dashboard' || pathname.startsWith('/dashboard/');
+
+  if (isAuthenticated) {
+    if (isAuthPage) {
+      const dashboard = request.nextUrl.clone();
+      dashboard.pathname = '/dashboard';
+      dashboard.search = '';
+      return NextResponse.redirect(dashboard);
+    }
+    return NextResponse.next();
   }
-});
+
+  if (isProtected) {
+    const loginUrl = request.nextUrl.clone();
+    loginUrl.pathname = '/login';
+    loginUrl.search = '';
+    loginUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  return NextResponse.next();
+}
 
 export const config = {
-  matcher: ['/dashboard/:path*']
+  matcher: ['/dashboard/:path*', '/login', '/signup']
 };

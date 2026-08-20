@@ -1,80 +1,55 @@
-import type { NextAuthOptions } from 'next-auth';
-import { getServerSession } from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs';
+import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
-import { loginSchema } from '@/lib/validation';
-import { authSecret } from '@/lib/auth-secret';
+import { verifyAccessToken, hashRefreshToken, readCookie, ACCESS_TOKEN_COOKIE, REFRESH_TOKEN_COOKIE } from '@/lib/tokens';
+import type { SessionUser } from '@/lib/session';
 
 /**
- * NextAuth configuration for CoRide.
+ * Server-side session helpers for the two-token model.
  *
- * Sessions use the JWT strategy (no database session table required): the
- * `jwt` callback stores the user's id and role on the token, and the `session`
- * callback exposes them back to the app as `session.user.id` / `session.user.role`.
+ * Pages (server components) import `getSession` / `hasValidRefreshToken` from
+ * here. Route handlers should use the request-based helpers in `@/lib/session`
+ * instead.
  *
- * Sign-in is handled by the Credentials provider, which validates the email
- * against the registered user and verifies the password with bcrypt. On any
- * failure `authorize` returns `null`, which NextAuth turns into a failed login
- * (the `/login` page then surfaces a generic "invalid credentials" error).
- *
- * NOTE: `NEXTAUTH_SECRET` should be set in production. When it is absent we
- * fall back to a shared deterministic secret (`@/lib/auth-secret`) so protected
- * routes keep working in local/demo deployments and CI. The middleware uses the
- * same shared secret so it can verify the session JWT.
+ * Access tokens are verified statelessly (signature + expiry). Because server
+ * components cannot set response cookies, the "silent refresh" case on pages
+ * is handled by redirecting to `POST/GET /api/auth/refresh` (see the login
+ * page guard) rather than by rotating here.
  */
-export const authOptions: NextAuthOptions = {
-  secret: authSecret,
-  session: { strategy: 'jwt' },
-  pages: { signIn: '/login' },
-  providers: [
-    CredentialsProvider({
-      name: 'Credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
-      },
-      async authorize(credentials) {
-        const parsed = loginSchema.safeParse(credentials);
-        if (!parsed.success) return null;
 
-        const { email, password } = parsed.data;
+export type { SessionUser } from '@/lib/session';
+export { setSessionCookies, clearSessionCookies, createSession, rotateSession, revokeSession, TokenError } from '@/lib/session';
 
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user) return null;
+/** Resolves the current user from the access-token cookie, or `null`. */
+export async function getSession(): Promise<SessionUser | null> {
+  const store = await cookies();
+  const token = store.get(ACCESS_TOKEN_COOKIE)?.value;
+  if (!token) return null;
 
-        const passwordMatches = await bcrypt.compare(password, user.passwordHash);
-        if (!passwordMatches) return null;
+  const payload = await verifyAccessToken(token);
+  if (!payload) return null;
 
-        // Never expose the password hash on the session/JWT.
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role
-        };
-      }
-    })
-  ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = (user as { role?: string }).role;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id;
-        session.user.role = token.role;
-      }
-      return session;
-    }
-  }
-};
+  return { id: payload.sub, email: payload.email, name: payload.name, role: payload.role };
+}
 
-/** Server-side helper: returns the current session (or `null`) using authOptions. */
-export function getSession() {
-  return getServerSession(authOptions);
+/**
+ * Checks whether a valid, unexpired, unrotated refresh token exists for the
+ * current request — i.e. the visitor can be silently renewed. Used by the
+ * login/signup page guards to bounce an already-authenticated user to the
+ * dashboard before the auth form renders (REQ-11).
+ */
+export async function hasValidRefreshToken(): Promise<boolean> {
+  const store = await cookies();
+  const token = store.get(REFRESH_TOKEN_COOKIE)?.value;
+  if (!token) return false;
+
+  const tokenHash = await hashRefreshToken(token);
+  const record = await prisma.refreshToken.findUnique({ where: { tokenHash } });
+  if (!record) return false;
+  if (record.revokedAt !== null || record.replacedByTokenId !== null) return false;
+  return record.expiresAt > new Date();
+}
+
+/** Reads a raw cookie header helper (kept for parity with lib/tokens). */
+export function parseCookie(header: string, name: string): string | null {
+  return readCookie(header, name);
 }
