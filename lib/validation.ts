@@ -103,3 +103,99 @@ export const vehicleSchema = z.object({
 });
 
 export type VehicleInput = z.infer<typeof vehicleSchema>;
+
+/**
+ * Ride field limits. `source`/`destination` map to `varchar(255)` columns and
+ * `notes` maps to `varchar(280)`, so the schemas cap input to the same sizes.
+ */
+const RIDE_SOURCE_MAX = 255;
+const RIDE_DESTINATION_MAX = 255;
+const RIDE_NOTES_MAX = 280;
+
+/** A departure is only valid if it is strictly in the future. */
+const futureDeparture = (date: Date) => date.getTime() > Date.now();
+
+/**
+ * Zod schema for `POST /api/rides`.
+ *
+ * - `vehicleId` must be a UUID. Ownership of the referenced vehicle is verified
+ *   server-side in the route (never trust a client-submitted owner).
+ * - `source` / `destination` are required, trimmed, and at least 2 characters.
+ * - `departureTime` is coerced from a number or ISO string and must be in the
+ *   future.
+ * - `seatsTotal` is coerced from a number or numeric string and must be an
+ *   integer of at least 1. The upper bound (the vehicle's seat capacity) depends
+ *   on the selected vehicle and is enforced in the route after lookup.
+ * - `notes` is optional and capped at 280 characters.
+ */
+export const rideCreateSchema = z.object({
+  vehicleId: z.string().uuid('A valid vehicle ID is required.'),
+  source: z
+    .string()
+    .trim()
+    .min(2, 'Source must be at least 2 characters long.')
+    .max(RIDE_SOURCE_MAX, `Source must be at most ${RIDE_SOURCE_MAX} characters long.`),
+  destination: z
+    .string()
+    .trim()
+    .min(2, 'Destination must be at least 2 characters long.')
+    .max(RIDE_DESTINATION_MAX, `Destination must be at most ${RIDE_DESTINATION_MAX} characters long.`),
+  departureTime: z
+    .coerce
+    .date()
+    .refine(futureDeparture, 'Departure time must be in the future.'),
+  seatsTotal: z.coerce
+    .number()
+    .int('Seats must be a whole number.')
+    .min(1, 'Seats must be at least 1.'),
+  notes: z
+    .string()
+    .trim()
+    .max(RIDE_NOTES_MAX, `Notes must be at most ${RIDE_NOTES_MAX} characters long.`)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined))
+});
+
+export type RideCreateInput = z.infer<typeof rideCreateSchema>;
+
+/**
+ * Zod schema for `PATCH /api/rides/{id}`.
+ *
+ * Every field is optional (partial update). The same per-field rules as creation
+ * apply. Whether a field is *allowed* to change is decided by the route based on
+ * the ride's accepted-seat lock state (REQ-9).
+ */
+export const rideUpdateSchema = z.object({
+  vehicleId: z.string().uuid('A valid vehicle ID is required.').optional(),
+  source: z
+    .string()
+    .trim()
+    .min(2, 'Source must be at least 2 characters long.')
+    .max(RIDE_SOURCE_MAX, `Source must be at most ${RIDE_SOURCE_MAX} characters long.`)
+    .optional(),
+  destination: z
+    .string()
+    .trim()
+    .min(2, 'Destination must be at least 2 characters long.')
+    .max(RIDE_DESTINATION_MAX, `Destination must be at most ${RIDE_DESTINATION_MAX} characters long.`)
+    .optional(),
+  departureTime: z
+    .coerce
+    .date()
+    .refine(futureDeparture, 'Departure time must be in the future.')
+    .optional(),
+  seatsTotal: z.coerce
+    .number()
+    .int('Seats must be a whole number.')
+    .min(1, 'Seats must be at least 1.')
+    .optional(),
+  notes: z
+    .string()
+    .trim()
+    .max(RIDE_NOTES_MAX, `Notes must be at most ${RIDE_NOTES_MAX} characters long.`)
+    .nullable()
+    .optional()
+    .transform((value) => (value === undefined ? undefined : value === '' || value === null ? null : value))
+});
+
+export type RideUpdateInput = z.infer<typeof rideUpdateSchema>;
