@@ -33,6 +33,9 @@ export default async function DashboardPage() {
         <li>Role: {role ?? 'USER'}</li>
       </ul>
       <p>
+        <Link href="/rides">My rides</Link> &middot; <Link href="/rides/new">Offer a ride</Link>
+      </p>
+      <p>
         <Link href="/">Back to home</Link>
       </p>
     </main>

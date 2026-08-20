@@ -1,0 +1,335 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+
+interface VehicleOption {
+  id: string;
+  label: string;
+  seatCapacity: number;
+}
+
+interface RideDetail {
+  id: string;
+  source: string;
+  destination: string;
+  departureTime: string;
+  seatsTotal: number;
+  seatsAvailable: number;
+  status: string;
+  notes: string | null;
+  vehicleId: string;
+  vehicle: {
+    id: string;
+    make: string;
+    model: string;
+    year: number;
+    licensePlate: string;
+    seatCapacity: number;
+  };
+}
+
+interface RideResponse {
+  ok: boolean;
+  ride?: RideDetail;
+  error?: string;
+  details?: Record<string, string[]>;
+}
+
+/** Converts an ISO timestamp to the `datetime-local` input value (local time). */
+function toDatetimeLocal(iso: string): string {
+  const date = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+export function RideDetailForm({
+  ride,
+  vehicles,
+  locked
+}: {
+  ride: RideDetail;
+  vehicles: VehicleOption[];
+  locked: boolean;
+}) {
+  const router = useRouter();
+
+  const [vehicleId, setVehicleId] = useState(ride.vehicleId);
+  const [source, setSource] = useState(ride.source);
+  const [destination, setDestination] = useState(ride.destination);
+  const [departureTime, setDepartureTime] = useState(toDatetimeLocal(ride.departureTime));
+  const [seatsTotal, setSeatsTotal] = useState(ride.seatsTotal);
+  const [notes, setNotes] = useState(ride.notes ?? '');
+
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const cancelled = ride.status === 'CANCELLED' || ride.status === 'COMPLETED';
+  const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
+
+  async function handleSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setFieldErrors(null);
+    setSuccess(null);
+    setLoading(true);
+
+    const payload: Record<string, unknown> = {
+      source: source.trim(),
+      destination: destination.trim(),
+      notes: notes.trim() || null
+    };
+    if (!locked) {
+      payload.vehicleId = vehicleId;
+      payload.departureTime = departureTime;
+      payload.seatsTotal = seatsTotal;
+    }
+
+    try {
+      const res = await fetch(`/api/rides/${ride.id}`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.status === 401) {
+        setError('Your session expired. Please sign in again.');
+        return;
+      }
+
+      const body: RideResponse = await res.json();
+      if (res.ok && body.ok && body.ride) {
+        setSuccess('Ride updated.');
+        setSource(body.ride.source);
+        setDestination(body.ride.destination);
+        setNotes(body.ride.notes ?? '');
+        setVehicleId(body.ride.vehicleId);
+        setDepartureTime(toDatetimeLocal(body.ride.departureTime));
+        setSeatsTotal(body.ride.seatsTotal);
+        router.refresh();
+      } else if (res.status === 400 && body.details) {
+        setFieldErrors(body.details);
+        setError(body.error ?? 'Please fix the highlighted fields.');
+      } else {
+        setError(body.error ?? 'Something went wrong. Please try again.');
+      }
+    } catch {
+      setError('Network error — please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCancel() {
+    if (!window.confirm('Cancel this ride? This cannot be undone.')) {
+      return;
+    }
+    setError(null);
+    setSuccess(null);
+    setCancelling(true);
+
+    try {
+      const res = await fetch(`/api/rides/${ride.id}`, {
+        method: 'DELETE'
+      });
+
+      if (res.status === 401) {
+        setError('Your session expired. Please sign in again.');
+        return;
+      }
+
+      const body: RideResponse = await res.json();
+      if (res.ok && body.ok) {
+        setSuccess('Ride cancelled.');
+        router.refresh();
+      } else {
+        setError(body.error ?? 'Something went wrong. Please try again.');
+      }
+    } catch {
+      setError('Network error — please try again.');
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSave} noValidate>
+      {error && (
+        <p role="alert" style={{ color: '#b00020' }}>
+          {error}
+        </p>
+      )}
+      {success && (
+        <p role="status" style={{ color: '#1e7d34' }}>
+          {success}
+        </p>
+      )}
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label htmlFor="vehicleId" style={labelStyle}>
+          Vehicle
+        </label>
+        <select
+          id="vehicleId"
+          name="vehicleId"
+          required
+          disabled={locked || cancelled}
+          value={vehicleId}
+          onChange={(event) => setVehicleId(event.target.value)}
+          style={inputStyle}
+        >
+          {vehicles.map((vehicle) => (
+            <option key={vehicle.id} value={vehicle.id}>
+              {vehicle.label}
+            </option>
+          ))}
+        </select>
+        {fieldErrors?.vehicleId?.map((message) => (
+          <small key={message} style={{ color: '#b00020', display: 'block' }}>
+            {message}
+          </small>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label htmlFor="source" style={labelStyle}>
+          Source
+        </label>
+        <input
+          id="source"
+          name="source"
+          type="text"
+          required
+          minLength={2}
+          disabled={cancelled}
+          value={source}
+          onChange={(event) => setSource(event.target.value)}
+          style={inputStyle}
+        />
+        {fieldErrors?.source?.map((message) => (
+          <small key={message} style={{ color: '#b00020', display: 'block' }}>
+            {message}
+          </small>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label htmlFor="destination" style={labelStyle}>
+          Destination
+        </label>
+        <input
+          id="destination"
+          name="destination"
+          type="text"
+          required
+          minLength={2}
+          disabled={cancelled}
+          value={destination}
+          onChange={(event) => setDestination(event.target.value)}
+          style={inputStyle}
+        />
+        {fieldErrors?.destination?.map((message) => (
+          <small key={message} style={{ color: '#b00020', display: 'block' }}>
+            {message}
+          </small>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label htmlFor="departureTime" style={labelStyle}>
+          Departure time
+        </label>
+        <input
+          id="departureTime"
+          name="departureTime"
+          type="datetime-local"
+          required
+          disabled={locked || cancelled}
+          value={departureTime}
+          onChange={(event) => setDepartureTime(event.target.value)}
+          style={inputStyle}
+        />
+        {fieldErrors?.departureTime?.map((message) => (
+          <small key={message} style={{ color: '#b00020', display: 'block' }}>
+            {message}
+          </small>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label htmlFor="seatsTotal" style={labelStyle}>
+          Seats offered
+        </label>
+        <input
+          id="seatsTotal"
+          name="seatsTotal"
+          type="number"
+          required
+          min={1}
+          max={selectedVehicle?.seatCapacity ?? ride.vehicle.seatCapacity}
+          disabled={locked || cancelled}
+          value={seatsTotal}
+          onChange={(event) => setSeatsTotal(Number(event.target.value))}
+          style={inputStyle}
+        />
+        {fieldErrors?.seatsTotal?.map((message) => (
+          <small key={message} style={{ color: '#b00020', display: 'block' }}>
+            {message}
+          </small>
+        ))}
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <label htmlFor="notes" style={labelStyle}>
+          Notes (optional)
+        </label>
+        <textarea
+          id="notes"
+          name="notes"
+          rows={2}
+          maxLength={280}
+          disabled={cancelled}
+          value={notes}
+          onChange={(event) => setNotes(event.target.value)}
+          style={inputStyle}
+        />
+        {fieldErrors?.notes?.map((message) => (
+          <small key={message} style={{ color: '#b00020', display: 'block' }}>
+            {message}
+          </small>
+        ))}
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading || cancelled}
+        style={{ padding: '0.6rem 1.2rem', cursor: loading || cancelled ? 'not-allowed' : 'pointer', marginRight: '0.5rem' }}
+      >
+        {loading ? 'Saving…' : 'Save changes'}
+      </button>
+
+      {!cancelled && (
+        <button
+          type="button"
+          disabled={cancelling}
+          onClick={handleCancel}
+          style={{ padding: '0.6rem 1.2rem', cursor: cancelling ? 'wait' : 'pointer', color: '#b00020' }}
+        >
+          {cancelling ? 'Cancelling…' : 'Cancel ride'}
+        </button>
+      )}
+    </form>
+  );
+}
+
+const labelStyle: React.CSSProperties = { display: 'block', marginBottom: '0.25rem' };
+
+const inputStyle: React.CSSProperties = {
+  display: 'block',
+  width: '100%',
+  padding: '0.5rem',
+  boxSizing: 'border-box'
+};
