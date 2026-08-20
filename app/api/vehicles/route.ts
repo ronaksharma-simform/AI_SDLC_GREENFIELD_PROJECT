@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getSession } from '@/lib/auth';
+import { getSessionFromRequestWithRefresh, setSessionCookies } from '@/lib/session';
 import { vehicleSchema } from '@/lib/validation';
 
 /**
  * POST /api/vehicles
  *
- * Creates a vehicle owned by the signed-in user. Requires a valid session
- * (JWT). Accepts a JSON body:
+ * Creates a vehicle owned by the signed-in user. Requires a valid session.
+ * The access token is verified from the request; if it is missing or expired
+ * but a valid refresh token is present, the session is silently renewed (new
+ * cookies are attached to the success response).
+ *
+ * Accepts a JSON body:
  *   {
  *     "make": string, "model": string, "year": number,
  *     "color"?: string, "licensePlate": string,
@@ -22,9 +26,9 @@ import { vehicleSchema } from '@/lib/validation';
  *   - 500 { ok: false, error }        unexpected failure
  */
 export async function POST(request: Request) {
-  const session = await getSession();
+  const { user, rotatedTokens } = await getSessionFromRequestWithRefresh(request);
 
-  if (!session?.user?.id) {
+  if (!user) {
     return Response.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   }
 
@@ -63,7 +67,7 @@ export async function POST(request: Request) {
   try {
     const vehicle = await prisma.vehicle.create({
       data: {
-        ownerId: session.user.id,
+        ownerId: user.id,
         make,
         model,
         year,
@@ -74,7 +78,11 @@ export async function POST(request: Request) {
       }
     });
 
-    return NextResponse.json({ ok: true, vehicle }, { status: 201 });
+    const response = NextResponse.json({ ok: true, vehicle }, { status: 201 });
+    if (rotatedTokens) {
+      setSessionCookies(response, rotatedTokens);
+    }
+    return response;
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       return Response.json(

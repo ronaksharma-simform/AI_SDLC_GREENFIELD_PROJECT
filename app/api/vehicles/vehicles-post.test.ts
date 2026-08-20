@@ -2,13 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Hoisted so the vi.mock factories can reference them (vitest hoists the mock
 // calls above imports; vi.hoisted avoids temporal-dead-zone surprises).
-const { mockGetSession, mockVehicleCreate } = vi.hoisted(() => ({
+const { mockGetSession, mockSetCookies, mockVehicleCreate } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
+  mockSetCookies: vi.fn(),
   mockVehicleCreate: vi.fn()
 }));
 
-vi.mock('@/lib/auth', () => ({
-  getSession: mockGetSession
+vi.mock('@/lib/session', () => ({
+  getSessionFromRequestWithRefresh: mockGetSession,
+  setSessionCookies: mockSetCookies
 }));
 
 vi.mock('@/lib/prisma', () => ({
@@ -21,18 +23,16 @@ vi.mock('@/lib/prisma', () => ({
 
 import { POST } from './route';
 
-const session = {
-  user: {
-    id: 'e6b9c1f8-3b3d-4b2f-9f2f-2f2f2f2f2f2f',
-    email: 'owner@example.com',
-    name: null,
-    role: 'USER'
-  }
+const sessionUser = {
+  id: 'e6b9c1f8-3b3d-4b2f-9f2f-2f2f2f2f2f2f',
+  email: 'owner@example.com',
+  name: null,
+  role: 'USER'
 };
 
 const createdVehicle = {
   id: '7a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d',
-  ownerId: session.user.id,
+  ownerId: sessionUser.id,
   make: 'Toyota',
   model: 'Corolla',
   year: 2021,
@@ -69,12 +69,13 @@ const validBody = {
 describe('POST /api/vehicles', () => {
   beforeEach(() => {
     mockGetSession.mockReset();
+    mockSetCookies.mockReset();
     mockVehicleCreate.mockReset();
-    mockGetSession.mockResolvedValue(session);
+    mockGetSession.mockResolvedValue({ user: sessionUser });
   });
 
   it('returns 401 when no session is present', async () => {
-    mockGetSession.mockResolvedValue(null);
+    mockGetSession.mockResolvedValue({ user: null });
 
     const res = await POST(makeRequest(JSON.stringify(validBody)));
 
@@ -97,7 +98,7 @@ describe('POST /api/vehicles', () => {
     // Ownership always comes from the session, never from the request body.
     expect(mockVehicleCreate).toHaveBeenCalledWith({
       data: {
-        ownerId: session.user.id,
+        ownerId: sessionUser.id,
         make: 'Toyota',
         model: 'Corolla',
         year: 2021,
@@ -107,6 +108,21 @@ describe('POST /api/vehicles', () => {
         vehicleType: 'SEDAN'
       }
     });
+  });
+
+  it('applies rotated session cookies when a silent refresh occurred', async () => {
+    mockGetSession.mockResolvedValue({
+      user: sessionUser,
+      rotatedTokens: { accessToken: 'new-access', refreshToken: 'new-refresh' }
+    });
+    mockVehicleCreate.mockResolvedValue(createdVehicle);
+
+    await POST(makeRequest(JSON.stringify(validBody)));
+
+    expect(mockSetCookies).toHaveBeenCalledWith(
+      expect.anything(),
+      { accessToken: 'new-access', refreshToken: 'new-refresh' }
+    );
   });
 
   it('stores null color when color is omitted', async () => {
@@ -157,7 +173,7 @@ describe('POST /api/vehicles', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.ok).toBe(false);
-    expect(body.details.vehicleType[0]).toContain("Invalid enum value");
+    expect(body.details.vehicleType[0]).toContain('Invalid enum value');
     expect(mockVehicleCreate).not.toHaveBeenCalled();
   });
 
