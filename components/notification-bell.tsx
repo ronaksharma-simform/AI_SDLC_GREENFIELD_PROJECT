@@ -195,7 +195,7 @@ export function NotificationBell() {
     setNotifications((items) => items.map((item) => ({ ...item, isRead: true })));
     setUnreadCount(0);
     try {
-      const res = await fetch('/api/notifications/read-all', { method: 'PATCH' });
+      const res = await fetch('/api/notifications', { method: 'PATCH' });
       if (res.ok) {
         const body: { ok: boolean; count: number } = await res.json();
         if (body.ok) setUnreadCount(0);

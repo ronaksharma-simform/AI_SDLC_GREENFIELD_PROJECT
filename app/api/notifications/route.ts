@@ -48,7 +48,7 @@ export async function GET() {
 }
 
 /**
- * PATCH /api/notifications/read-all
+ * PATCH /api/notifications
  *
  * Marks every unread notification belonging to the current user as read in one
  * operation (NOTIF-5 / Section 11.4). Only the caller's own notifications are

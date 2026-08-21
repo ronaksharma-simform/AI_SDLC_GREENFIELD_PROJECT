@@ -102,7 +102,7 @@ describe('GET /api/notifications', () => {
   });
 });
 
-describe('PATCH /api/notifications/read-all', () => {
+describe('PATCH /api/notifications', () => {
   beforeEach(() => {
     mockGetSession.mockReset();
     mockNotificationUpdateMany.mockReset();
