@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { SignOutButton } from '@/components/sign-out-button';
 import { MobileNav } from '@/components/mobile-nav';
+import { NotificationBell } from '@/components/notification-bell';
 
 export interface NavItem {
   href: string;
@@ -49,33 +50,39 @@ export async function SiteHeader() {
           <span className="hidden text-lg sm:inline">CoRide</span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
-          {authed ? (
-            <>
-              {primaryItems.map((item) => (
-                <Button key={item.href} asChild variant="ghost" size="sm">
-                  <Link href={item.href}>{item.label}</Link>
+        <div className="flex items-center gap-1">
+          <nav className="hidden items-center gap-1 md:flex" aria-label="Primary">
+            {authed ? (
+              <>
+                {primaryItems.map((item) => (
+                  <Button key={item.href} asChild variant="ghost" size="sm">
+                    <Link href={item.href}>{item.label}</Link>
+                  </Button>
+                ))}
+                <SignOutButton />
+              </>
+            ) : (
+              <>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/login">Sign in</Link>
                 </Button>
-              ))}
-              <SignOutButton />
-            </>
-          ) : (
-            <>
-              <Button asChild variant="ghost" size="sm">
-                <Link href="/login">Sign in</Link>
-              </Button>
-              <Button asChild size="sm">
-                <Link href="/signup">
-                  <PlusCircle />
-                  Get started
-                </Link>
-              </Button>
-            </>
-          )}
-          <ThemeToggle />
-        </nav>
+                <Button asChild size="sm">
+                  <Link href="/signup">
+                    <PlusCircle />
+                    Get started
+                  </Link>
+                </Button>
+              </>
+            )}
+            <ThemeToggle />
+          </nav>
 
-        <MobileNav items={primaryItems} authed={authed} />
+          {/* Bell is rendered outside the desktop nav so it is visible on
+              every authenticated page, including mobile (Section 5). */}
+          {authed ? <NotificationBell /> : null}
+
+          <MobileNav items={primaryItems} authed={authed} />
+        </div>
       </div>
     </header>
   );

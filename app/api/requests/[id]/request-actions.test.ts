@@ -176,7 +176,7 @@ describe('PATCH /api/requests/{id}/accept', () => {
         status: 'ACTIVE'
       }
     });
-    expect(mockNotifyUser).toHaveBeenCalledWith(SEEKER_ID, 'ride_request_accepted', expect.anything());
+    expect(mockNotifyUser).toHaveBeenCalledWith(SEEKER_ID, 'RideRequestAccepted', expect.anything());
   });
 
   it('returns 409 when the ride no longer has enough seats', async () => {
@@ -220,7 +220,7 @@ describe('PATCH /api/requests/{id}/reject', () => {
       where: { id: REQUEST_ID },
       data: { status: 'REJECTED', respondedAt: expect.any(Date) }
     });
-    expect(mockNotifyUser).toHaveBeenCalledWith(SEEKER_ID, 'ride_request_rejected', expect.anything());
+    expect(mockNotifyUser).toHaveBeenCalledWith(SEEKER_ID, 'RideRequestRejected', expect.anything());
   });
 
   it('returns 409 when the request is already responded to', async () => {

@@ -143,10 +143,11 @@ export async function POST(request: Request, { params }: RouteContext) {
         : conversation.providerId;
 
     // REQ-5: the recipient is notified of the new message. Delivery (push /
-    // email / in-app) is owned by the separate Notifications module.
-    await notifyUser(otherUserId, 'conversation_new_message', {
-      conversationId: id,
-      rideId: conversation.rideId
+    // email / in-app) is owned by the separate Notifications module; `senderName`
+    // lets it build the "New message from …" copy.
+    await notifyUser(otherUserId, 'NewMessage', {
+      rideId: conversation.rideId,
+      senderName: session.user.name ?? session.user.email ?? undefined
     });
 
     return NextResponse.json({ ok: true, message }, { status: 201 });

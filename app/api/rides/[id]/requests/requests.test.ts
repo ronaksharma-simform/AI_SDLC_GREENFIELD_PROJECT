@@ -187,7 +187,7 @@ describe('POST /api/rides/{id}/requests', () => {
         message: 'I have a small bag'
       }
     });
-    expect(mockNotifyUser).toHaveBeenCalledWith(PROVIDER_ID, 'ride_request_received', expect.anything());
+    expect(mockNotifyUser).toHaveBeenCalledWith(PROVIDER_ID, 'RideRequestReceived', expect.anything());
   });
 });
 

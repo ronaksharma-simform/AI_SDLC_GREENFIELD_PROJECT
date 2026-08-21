@@ -109,8 +109,8 @@ export async function PATCH(_request: Request, { params }: RouteContext) {
         return { request: updatedRequest, ride };
       });
 
-      // REQ-19d: the Seeker is notified of the acceptance.
-      await notifyUser(rideRequest.seekerId, 'ride_request_accepted', {
+      // REQ-19d / NOTIF-2: the Seeker is notified of the acceptance.
+      await notifyUser(rideRequest.seekerId, 'RideRequestAccepted', {
         rideId: rideRequest.rideId,
         requestId: id
       });
