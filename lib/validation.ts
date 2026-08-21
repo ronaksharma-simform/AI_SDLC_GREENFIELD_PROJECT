@@ -247,8 +247,38 @@ export const rideRequestCreateSchema = z.object({
 
 export type RideRequestCreateInput = z.infer<typeof rideRequestCreateSchema>;
 
-/** Default departure-time tolerance for the discovery feed (±30 minutes). */
-export const DEFAULT_FEED_TOLERANCE_MINUTES = 30;
+/**
+ * Resolves an optional environment override for a numeric default, falling back
+ * to `fallback` when the variable is unset, empty, or not a positive number.
+ *
+ * Both feed defaults live behind environment variables so product/ops can tune
+ * them without a code change (Part B — REQ-7). The variables are read once at
+ * module load; tests can set `process.env` before importing this module.
+ */
+function envPositiveNumber(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === '') return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * Default departure-time tolerance for the discovery feed (±30 minutes).
+ * Configurable via `FEED_DEFAULT_TIME_WINDOW_MINUTES` (REQ-7).
+ */
+export const DEFAULT_FEED_TOLERANCE_MINUTES = envPositiveNumber(
+  process.env.FEED_DEFAULT_TIME_WINDOW_MINUTES,
+  30
+);
+
+/**
+ * Default proximity radius for the discovery feed (500 meters) applied when the
+ * Seeker supplies a pickup point (`lat`/`lng`) but no explicit `radius`.
+ * Configurable via `FEED_DEFAULT_RADIUS_METERS` (REQ-7).
+ */
+export const DEFAULT_PROXIMITY_RADIUS_METERS = envPositiveNumber(
+  process.env.FEED_DEFAULT_RADIUS_METERS,
+  500
+);
 
 /**
  * Zod schema for the query string of `GET /api/rides/feed`.
@@ -259,10 +289,20 @@ export const DEFAULT_FEED_TOLERANCE_MINUTES = 30;
  * - `source` / `destination` are free-text route filters, matched
  *   case-insensitively against the ride's stored addresses.
  * - `time` must be a valid date/time. When provided, only rides whose departure
- *   falls within `±toleranceMinutes` of that time are returned (REQ-13a).
+ *   falls within `±window` (or `±toleranceMinutes`) of that time are returned
+ *   (REQ-13a).
  * - `seats` must be a positive integer; only rides with at least that many
  *   available seats are returned (REQ-13b).
  * - `toleranceMinutes` configures the time window; defaults to 30 (REQ-13a).
+ *   Kept for backwards compatibility with the base feed spec.
+ * - `window` is the Part B name for the same time-window filter; a positive
+ *   number of minutes, defaults to 30. Takes precedence over
+ *   `toleranceMinutes` when both are provided.
+ * - `lat` / `lng` are the Seeker's pickup-point coordinates. When **both** are
+ *   provided, only rides whose pickup point lies within `radius` meters are
+ *   returned (proximity filter, Part B REQ-1/REQ-2).
+ * - `radius` is a positive number of meters; defaults to
+ *   `DEFAULT_PROXIMITY_RADIUS_METERS` (500m) when omitted (REQ-2).
  */
 export const rideFeedQuerySchema = z.object({
   source: z
@@ -288,6 +328,26 @@ export const rideFeedQuerySchema = z.object({
     .int('Tolerance must be a whole number of minutes.')
     .min(0, 'Tolerance must be at least 0 minutes.')
     .max(1440, 'Tolerance must be at most 1440 minutes.')
+    .optional(),
+  window: z.coerce
+    .number()
+    .positive('Window must be a positive number of minutes.')
+    .max(1440, 'Window must be at most 1440 minutes.')
+    .optional(),
+  lat: z.coerce
+    .number()
+    .min(-90, 'Latitude must be between -90 and 90.')
+    .max(90, 'Latitude must be between -90 and 90.')
+    .optional(),
+  lng: z.coerce
+    .number()
+    .min(-180, 'Longitude must be between -180 and 180.')
+    .max(180, 'Longitude must be between -180 and 180.')
+    .optional(),
+  radius: z.coerce
+    .number()
+    .positive('Radius must be a positive number of meters.')
+    .max(50000, 'Radius must be at most 50000 meters.')
     .optional()
 });
 
