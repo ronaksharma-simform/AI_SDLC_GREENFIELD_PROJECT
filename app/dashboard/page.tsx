@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, CalendarClock, CarFront, Mail, Shield } from 'lucide-react';
+import { ArrowRight, CalendarClock, CarFront, Mail, Search, Shield } from 'lucide-react';
 
 import { getSession } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,18 @@ export const metadata = {
 };
 
 const QUICK_ACTIONS = [
+  {
+    href: '/rides/feed',
+    title: 'Find a ride',
+    description: 'Browse available rides and request a seat.',
+    icon: Search
+  },
+  {
+    href: '/requests',
+    title: 'Requests',
+    description: 'Track the requests you sent and respond to incoming ones.',
+    icon: Mail
+  },
   {
     href: '/rides',
     title: 'My rides',
@@ -79,7 +91,7 @@ export default async function DashboardPage() {
           <h2 id="quick-actions-heading" className="text-lg font-semibold">
             Quick actions
           </h2>
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {QUICK_ACTIONS.map((action) => (
               <Card key={action.href} className="transition-shadow hover:shadow-md">
                 <CardContent className="flex flex-col items-start gap-3 p-5">

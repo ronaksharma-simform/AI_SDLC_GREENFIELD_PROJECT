@@ -25,6 +25,8 @@ export async function SiteHeader() {
 
   const primaryItems: NavItem[] = authed
     ? [
+        { href: '/rides/feed', label: 'Find a ride' },
+        { href: '/requests', label: 'Requests' },
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/rides', label: 'My rides' },
         { href: '/rides/new', label: 'Offer a ride' },
