@@ -180,11 +180,13 @@ export async function POST(request: Request, { params }: RouteContext) {
       }
     });
 
-    // REQ-16: the Provider is notified of the new request (delivery is the
-    // separate Notifications module's concern).
-    await notifyUser(ride.providerId, 'ride_request_received', {
+    // REQ-16 / NOTIF-1: the Provider is notified of the new request. Delivery
+    // is the Notifications module's concern; `seekerName` lets it build the
+    // "New ride request from …" copy.
+    await notifyUser(ride.providerId, 'RideRequestReceived', {
       rideId: id,
-      requestId: created.id
+      requestId: created.id,
+      seekerName: session.user.name ?? session.user.email ?? undefined
     });
 
     return NextResponse.json({ ok: true, request: created }, { status: 201 });

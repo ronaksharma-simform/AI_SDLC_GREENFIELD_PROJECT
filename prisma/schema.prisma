@@ -49,6 +49,14 @@ enum ConversationStatus {
   CLOSED
 }
 
+enum NotificationType {
+  RideRequestReceived
+  RideRequestAccepted
+  RideRequestRejected
+  TripReminder
+  NewMessage
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
@@ -63,6 +71,7 @@ model User {
   conversationsAsProvider Conversation[] @relation("ConversationProvider")
   conversationsAsSeeker   Conversation[] @relation("ConversationSeeker")
   messagesSent            Message[]       @relation("MessageSender")
+  notifications           Notification[]
 
   @@map("users")
 }
@@ -104,11 +113,13 @@ model Ride {
   notes                String?    @db.VarChar(280)
   createdAt            DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  reminderSentAt       DateTime?  @map("reminder_sent_at") @db.Timestamptz(6)
 
   provider      User           @relation(fields: [providerId], references: [id], onDelete: Cascade)
   vehicle       Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   requests      RideRequest[]
   conversations Conversation[]
+  notifications Notification[]
 
   @@index([providerId])
   @@index([vehicleId])
@@ -125,8 +136,9 @@ model RideRequest {
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   respondedAt    DateTime?         @map("responded_at") @db.Timestamptz(6)
 
-  ride   Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
-  seeker User @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  ride          Ride            @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  seeker        User            @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  notifications Notification[]
 
   @@index([rideId])
   @@index([seekerId])
@@ -168,4 +180,24 @@ model Message {
 
   @@index([conversationId, sentAt])
   @@map("messages")
+}
+
+model Notification {
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  type             NotificationType @map("type")
+  title            String           @db.VarChar(120)
+  message          String           @db.VarChar(280)
+  relatedRideId    String?          @map("related_ride_id") @db.Uuid
+  relatedRequestId String?          @map("related_request_id") @db.Uuid
+  isRead           Boolean          @default(false) @map("is_read")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relatedRide    Ride?        @relation(fields: [relatedRideId], references: [id], onDelete: SetNull)
+  relatedRequest RideRequest? @relation(fields: [relatedRequestId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

@@ -206,9 +206,9 @@ describe('POST /api/conversations/{id}/messages', () => {
         content: 'See you alert(1)'
       }
     });
-    expect(mockNotifyUser).toHaveBeenCalledWith(SEEKER_ID, 'conversation_new_message', {
-      conversationId: CONVERSATION_ID,
-      rideId: RIDE_ID
+    expect(mockNotifyUser).toHaveBeenCalledWith(SEEKER_ID, 'NewMessage', {
+      rideId: RIDE_ID,
+      senderName: 'Provider'
     });
   });
 });

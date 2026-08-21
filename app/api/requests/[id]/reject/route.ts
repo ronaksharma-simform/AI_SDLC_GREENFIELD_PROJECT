@@ -63,7 +63,7 @@ export async function PATCH(_request: Request, { params }: RouteContext) {
     });
 
     // REQ-19d: the Seeker is notified of the rejection.
-    await notifyUser(rideRequest.seekerId, 'ride_request_rejected', {
+    await notifyUser(rideRequest.seekerId, 'RideRequestRejected', {
       rideId: rideRequest.rideId,
       requestId: id
     });
