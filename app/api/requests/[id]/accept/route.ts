@@ -86,6 +86,26 @@ export async function PATCH(_request: Request, { params }: RouteContext) {
           data: { status: 'ACCEPTED', respondedAt: new Date() }
         });
 
+        // REQ-1 / REQ-8: acceptance is the only event that creates a chat
+        // conversation. A unique (ride, provider, seeker) constraint keeps the
+        // pairing to exactly one conversation per accepted request.
+        await tx.conversation.upsert({
+          where: {
+            rideId_providerId_seekerId: {
+              rideId: rideRequest.rideId,
+              providerId: rideRequest.ride.providerId,
+              seekerId: rideRequest.seekerId
+            }
+          },
+          update: {},
+          create: {
+            rideId: rideRequest.rideId,
+            providerId: rideRequest.ride.providerId,
+            seekerId: rideRequest.seekerId,
+            status: 'ACTIVE'
+          }
+        });
+
         return { request: updatedRequest, ride };
       });
 

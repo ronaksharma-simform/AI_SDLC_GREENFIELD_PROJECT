@@ -118,6 +118,8 @@ export function RideDetailForm({
   const [loading, setLoading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
 
   const cancelled = ride.status === 'CANCELLED' || ride.status === 'COMPLETED';
   const selectedVehicle = vehicles.find((vehicle) => vehicle.id === vehicleId);
@@ -180,6 +182,36 @@ export function RideDetailForm({
       setError('Network error — please try again.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleComplete() {
+    setCompleteOpen(false);
+    setError(null);
+    setSuccess(null);
+    setCompleting(true);
+
+    try {
+      const res = await fetch(`/api/rides/${ride.id}/complete`, {
+        method: 'POST'
+      });
+
+      if (res.status === 401) {
+        setError('Your session expired. Please sign in again.');
+        return;
+      }
+
+      const body: RideResponse = await res.json();
+      if (res.ok && body.ok) {
+        setSuccess('Ride completed.');
+        router.refresh();
+      } else {
+        setError(body.error ?? 'Something went wrong. Please try again.');
+      }
+    } catch {
+      setError('Network error — please try again.');
+    } finally {
+      setCompleting(false);
     }
   }
 
@@ -325,30 +357,55 @@ export function RideDetailForm({
         </Button>
 
         {!cancelled ? (
-          <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
-            <AlertDialogTrigger asChild>
-              <Button type="button" variant="outline" size="lg" disabled={cancelling}>
-                {cancelling ? 'Cancelling…' : 'Cancel ride'}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Cancel this ride?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This cannot be undone. Riders who have requested seats will be notified.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Keep ride</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={handleCancel}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Cancel ride
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <>
+            <AlertDialog open={completeOpen} onOpenChange={setCompleteOpen}>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="outline" size="lg" disabled={completing}>
+                  {completing ? 'Completing…' : 'Mark complete'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Complete this ride?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This closes the ride and its chat conversations. Message
+                    history stays available but no new messages can be sent.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Not yet</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleComplete}>
+                    Mark complete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
+              <AlertDialogTrigger asChild>
+                <Button type="button" variant="outline" size="lg" disabled={cancelling}>
+                  {cancelling ? 'Cancelling…' : 'Cancel ride'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Cancel this ride?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This cannot be undone. Riders who have requested seats will be notified.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Keep ride</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleCancel}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Cancel ride
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
         ) : null}
       </div>
     </form>

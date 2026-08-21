@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Hoisted so the vi.mock factories can reference them.
-const { mockGetSession, mockRideFindUnique, mockRideUpdate, mockVehicleFindUnique } = vi.hoisted(() => ({
+const {
+  mockGetSession,
+  mockRideFindUnique,
+  mockRideUpdate,
+  mockVehicleFindUnique,
+  mockConversationUpdateMany
+} = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
   mockRideFindUnique: vi.fn(),
   mockRideUpdate: vi.fn(),
-  mockVehicleFindUnique: vi.fn()
+  mockVehicleFindUnique: vi.fn(),
+  mockConversationUpdateMany: vi.fn()
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -20,6 +27,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     vehicle: {
       findUnique: mockVehicleFindUnique
+    },
+    conversation: {
+      updateMany: mockConversationUpdateMany
     }
   }
 }));
@@ -438,6 +448,8 @@ describe('DELETE /api/rides/{id}', () => {
     mockGetSession.mockReset();
     mockRideFindUnique.mockReset();
     mockRideUpdate.mockReset();
+    mockConversationUpdateMany.mockReset();
+    mockConversationUpdateMany.mockResolvedValue({ count: 0 });
     mockGetSession.mockResolvedValue(session);
   });
 
@@ -489,6 +501,11 @@ describe('DELETE /api/rides/{id}', () => {
     expect(mockRideUpdate).toHaveBeenCalledWith({
       where: { id: RIDE_ID },
       data: { status: 'CANCELLED' }
+    });
+    // REQ-6: cancelling a ride closes its chat conversations.
+    expect(mockConversationUpdateMany).toHaveBeenCalledWith({
+      where: { rideId: RIDE_ID, status: 'ACTIVE' },
+      data: { status: 'CLOSED', closedAt: expect.any(Date) }
     });
   });
 

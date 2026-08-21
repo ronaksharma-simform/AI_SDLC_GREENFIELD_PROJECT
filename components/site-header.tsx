@@ -27,6 +27,7 @@ export async function SiteHeader() {
     ? [
         { href: '/rides/feed', label: 'Find a ride' },
         { href: '/requests', label: 'Requests' },
+        { href: '/messages', label: 'Messages' },
         { href: '/dashboard', label: 'Dashboard' },
         { href: '/rides', label: 'My rides' },
         { href: '/rides/new', label: 'Offer a ride' },
