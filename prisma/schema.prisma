@@ -44,17 +44,25 @@ enum RideRequestStatus {
   CANCELLED
 }
 
+enum ConversationStatus {
+  ACTIVE
+  CLOSED
+}
+
 model User {
   id           String   @id @default(uuid()) @db.Uuid
   email        String   @unique
   passwordHash String   @map("password_hash") @db.VarChar(255)
   name         String?  @db.VarChar(100)
   role         Role       @default(USER)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
-  vehicles     Vehicle[]
-  rides        Ride[]
-  rideRequests RideRequest[]
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  vehicles             Vehicle[]
+  rides                Ride[]
+  rideRequests         RideRequest[]
+  conversationsAsProvider Conversation[] @relation("ConversationProvider")
+  conversationsAsSeeker   Conversation[] @relation("ConversationSeeker")
+  messagesSent            Message[]       @relation("MessageSender")
 
   @@map("users")
 }
@@ -97,9 +105,10 @@ model Ride {
   createdAt            DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  provider User    @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  vehicle  Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  requests RideRequest[]
+  provider      User           @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  vehicle       Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  requests      RideRequest[]
+  conversations Conversation[]
 
   @@index([providerId])
   @@index([vehicleId])
@@ -123,4 +132,40 @@ model RideRequest {
   @@index([seekerId])
   @@index([rideId, seekerId, status])
   @@map("ride_requests")
+}
+
+model Conversation {
+  id         String             @id @default(uuid()) @db.Uuid
+  rideId     String             @map("ride_id") @db.Uuid
+  providerId String             @map("provider_id") @db.Uuid
+  seekerId   String             @map("seeker_id") @db.Uuid
+  status     ConversationStatus @default(ACTIVE)
+  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  closedAt   DateTime?          @map("closed_at") @db.Timestamptz(6)
+
+  ride     Ride      @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  provider User      @relation("ConversationProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  seeker   User      @relation("ConversationSeeker", fields: [seekerId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  // A conversation is a 1:1 chat per accepted ride/request pairing (Part A §3.3).
+  @@unique([rideId, providerId, seekerId])
+  @@index([providerId])
+  @@index([seekerId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  senderId       String   @map("sender_id") @db.Uuid
+  content        String   @db.Text
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+  readAt         DateTime? @map("read_at") @db.Timestamptz(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, sentAt])
+  @@map("messages")
 }

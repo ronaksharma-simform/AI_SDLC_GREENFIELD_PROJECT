@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { rideUpdateSchema } from '@/lib/validation';
 import { areLocationsTooClose, isRideLocked, isValidUuid } from '@/lib/rides';
+import { closeConversationsForRide } from '@/lib/conversations';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -271,7 +272,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
  * Cancels a ride the caller owns. Cancellation is a status change, never a hard
  * delete, so ride history is preserved for reporting, disputes, and rating
  * context. Cancelling an already-cancelled ride is a no-op; a completed ride
- * cannot be cancelled.
+ * cannot be cancelled. Any chat conversations for the ride are closed (REQ-6)
+ * so no new messages can be sent, while history is preserved.
  *
  * Responses:
  *   - 200 { ok: true, ride }        on success (ride.status === CANCELLED)
@@ -315,6 +317,10 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
       where: { id },
       data: { status: 'CANCELLED' }
     });
+
+    // REQ-6: a cancelled ride closes its chat conversations — history remains
+    // visible but no further messages can be sent.
+    await closeConversationsForRide(id);
 
     return NextResponse.json({ ok: true, ride: cancelled });
   } catch (error) {

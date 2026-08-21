@@ -35,6 +35,29 @@ export default async function MyRequestsPage() {
     orderBy: { createdAt: 'desc' }
   });
 
+  // Resolve the conversation id for each Accepted request so the "Message"
+  // entry point can deep-link into the chat (Part A §6).
+  const acceptedPairs = requests
+    .filter((request) => request.status === 'ACCEPTED')
+    .map((request) => ({
+      rideId: request.rideId,
+      providerId: request.ride.providerId,
+      seekerId: session.user.id
+    }));
+  const conversationIdByPair = new Map<string, string>();
+  if (acceptedPairs.length > 0) {
+    const conversations = await prisma.conversation.findMany({
+      where: { OR: acceptedPairs },
+      select: { id: true, rideId: true, providerId: true, seekerId: true }
+    });
+    for (const conversation of conversations) {
+      conversationIdByPair.set(
+        `${conversation.rideId}:${conversation.providerId}:${conversation.seekerId}`,
+        conversation.id
+      );
+    }
+  }
+
   return (
     <main className="container py-10">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -94,6 +117,20 @@ export default async function MyRequestsPage() {
                     <Button asChild variant="outline" size="sm">
                       <Link href={`/rides/feed/${request.rideId}`}>View ride</Link>
                     </Button>
+                    {request.status === 'ACCEPTED' ? (
+                      (() => {
+                        const conversationId = conversationIdByPair.get(
+                          `${request.rideId}:${request.ride.providerId}:${session.user.id}`
+                        );
+                        return conversationId ? (
+                          <Button asChild size="sm">
+                            <Link href={`/messages/${conversationId}`}>
+                              Message {request.ride.provider.name ?? request.ride.provider.email}
+                            </Link>
+                          </Button>
+                        ) : null;
+                      })()
+                    ) : null}
                     {request.status === 'PENDING' ? (
                       <CancelRequestButton requestId={request.id} />
                     ) : null}

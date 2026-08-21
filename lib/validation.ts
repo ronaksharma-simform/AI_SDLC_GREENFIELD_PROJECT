@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MESSAGE_CONTENT_MAX } from '@/lib/conversations';
 
 /**
  * Zod schema for `POST /api/auth/register`.
@@ -246,6 +247,23 @@ export const rideRequestCreateSchema = z.object({
 });
 
 export type RideRequestCreateInput = z.infer<typeof rideRequestCreateSchema>;
+
+/**
+ * Zod schema for `POST /api/conversations/{id}/messages`.
+ *
+ * - `content` is required, trimmed, and capped at `MESSAGE_CONTENT_MAX`
+ *   characters. It is additionally sanitized (HTML stripped, control chars
+ *   normalised) in `lib/conversations.sanitizeMessageContent` before storage.
+ */
+export const messageCreateSchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, 'Message cannot be empty.')
+    .max(MESSAGE_CONTENT_MAX, `Message must be at most ${MESSAGE_CONTENT_MAX} characters long.`)
+});
+
+export type MessageCreateInput = z.infer<typeof messageCreateSchema>;
 
 /**
  * Resolves an optional environment override for a numeric default, falling back

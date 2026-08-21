@@ -39,6 +39,31 @@ export default async function IncomingRequestsPage() {
     ride.requests.some((request) => request.status === 'PENDING')
   );
 
+  // Resolve the conversation id for each Accepted request so the "Message"
+  // entry point can deep-link into the chat (Part A §6).
+  const acceptedPairs = ridesWithRequests.flatMap((ride) =>
+    ride.requests
+      .filter((request) => request.status === 'ACCEPTED')
+      .map((request) => ({
+        rideId: ride.id,
+        providerId: session.user.id,
+        seekerId: request.seeker.id
+      }))
+  );
+  const conversationIdByPair = new Map<string, string>();
+  if (acceptedPairs.length > 0) {
+    const conversations = await prisma.conversation.findMany({
+      where: { OR: acceptedPairs },
+      select: { id: true, rideId: true, providerId: true, seekerId: true }
+    });
+    for (const conversation of conversations) {
+      conversationIdByPair.set(
+        `${conversation.rideId}:${conversation.providerId}:${conversation.seekerId}`,
+        conversation.id
+      );
+    }
+  }
+
   return (
     <main className="container py-10">
       <div className="mx-auto max-w-3xl space-y-6">
@@ -109,6 +134,22 @@ export default async function IncomingRequestsPage() {
                         {/* Only pending requests are actionable. Responded ones
                             stay visible with their status badge but lose the
                             action buttons (Part A §7). */}
+                        {request.status === 'ACCEPTED' ? (
+                          (() => {
+                            const conversationId = conversationIdByPair.get(
+                              `${ride.id}:${session.user.id}:${request.seeker.id}`
+                            );
+                            return conversationId ? (
+                              <div className="mt-3">
+                                <Button asChild size="sm">
+                                  <Link href={`/messages/${conversationId}`}>
+                                    Message {request.seeker.name ?? request.seeker.email}
+                                  </Link>
+                                </Button>
+                              </div>
+                            ) : null;
+                          })()
+                        ) : null}
                         {request.status === 'PENDING' ? (
                           <RespondRequestButtons requestId={request.id} />
                         ) : null}

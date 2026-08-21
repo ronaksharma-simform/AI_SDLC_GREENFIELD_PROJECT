@@ -7,7 +7,8 @@ const {
   mockRideUpdate,
   mockRideFindUnique,
   mock$transaction,
-  mockNotifyUser
+  mockNotifyUser,
+  mockConversationUpsert
 } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
   mockRequestFindUnique: vi.fn(),
@@ -15,7 +16,8 @@ const {
   mockRideUpdate: vi.fn(),
   mockRideFindUnique: vi.fn(),
   mock$transaction: vi.fn(),
-  mockNotifyUser: vi.fn()
+  mockNotifyUser: vi.fn(),
+  mockConversationUpsert: vi.fn()
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -100,6 +102,8 @@ describe('PATCH /api/requests/{id}/accept', () => {
     mockRequestUpdate.mockReset();
     mock$transaction.mockReset();
     mockNotifyUser.mockReset();
+    mockConversationUpsert.mockReset();
+    mockConversationUpsert.mockResolvedValue({ id: 'convo-1' });
     mockGetSession.mockResolvedValue(providerSession);
   });
 
@@ -134,7 +138,8 @@ describe('PATCH /api/requests/{id}/accept', () => {
     mockRequestFindUnique.mockResolvedValue(requestWith());
     const tx = {
       ride: { findUnique: mockRideFindUnique, update: mockRideUpdate },
-      rideRequest: { update: mockRequestUpdate }
+      rideRequest: { update: mockRequestUpdate },
+      conversation: { upsert: mockConversationUpsert }
     };
     mockTx(tx);
     mockRideFindUnique.mockResolvedValue({ ...ride, seatsAvailable: 2 });
@@ -153,6 +158,23 @@ describe('PATCH /api/requests/{id}/accept', () => {
     expect(mockRequestUpdate).toHaveBeenCalledWith({
       where: { id: REQUEST_ID },
       data: { status: 'ACCEPTED', respondedAt: expect.any(Date) }
+    });
+    // REQ-1 / REQ-8: acceptance creates the Provider↔Seeker conversation.
+    expect(mockConversationUpsert).toHaveBeenCalledWith({
+      where: {
+        rideId_providerId_seekerId: {
+          rideId: RIDE_ID,
+          providerId: PROVIDER_ID,
+          seekerId: SEEKER_ID
+        }
+      },
+      update: {},
+      create: {
+        rideId: RIDE_ID,
+        providerId: PROVIDER_ID,
+        seekerId: SEEKER_ID,
+        status: 'ACTIVE'
+      }
     });
     expect(mockNotifyUser).toHaveBeenCalledWith(SEEKER_ID, 'ride_request_accepted', expect.anything());
   });

@@ -38,6 +38,9 @@ interface LocationPickerProps {
 /** Drags fire a single reverse-geocoding call after the pin stops moving. */
 const REVERSE_DEBOUNCE_MS = 350;
 
+/** Forward-geocoding fires only after the user pauses typing (FIX-2). */
+const SEARCH_DEBOUNCE_MS = 400;
+
 export function LocationPicker({
   id,
   label,
@@ -51,6 +54,8 @@ export function LocationPicker({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapHandleRef = useRef<LocationMapHandle | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchSeqRef = useRef(0);
   const onChangeRef = useRef(onChange);
   useEffect(() => {
     onChangeRef.current = onChange;
@@ -87,6 +92,7 @@ export function LocationPicker({
     return () => {
       cancelled = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
       handle?.destroy();
       mapHandleRef.current = null;
     };
@@ -140,17 +146,20 @@ export function LocationPicker({
     }, REVERSE_DEBOUNCE_MS);
   }
 
-  async function handleSearch(event: React.FormEvent) {
-    event.preventDefault();
-    const query = searchQuery.trim();
-    if (!query) return;
+  async function runSearch(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed) return;
 
+    const seq = ++searchSeqRef.current;
     setSearching(true);
     setSearchError(null);
-    setResults([]);
+    // Clear previous results while a new search is in flight so loading,
+    // no-results, and error states stay visually distinct (FIX-4).
+    setResults(null);
     try {
-      const res = await fetch(`/api/geocode/search?query=${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/geocode/search?query=${encodeURIComponent(trimmed)}`);
       const body = await res.json();
+      if (seq !== searchSeqRef.current) return; // stale response, ignore
       if (res.ok && body.ok) {
         setResults(body.results as PlaceResult[]);
       } else {
@@ -158,10 +167,39 @@ export function LocationPicker({
         setSearchError(body.error ?? 'Place search failed.');
       }
     } catch {
+      if (seq !== searchSeqRef.current) return;
+      setResults(null);
       setSearchError('Place search failed. Select the location directly on the map instead.');
     } finally {
-      setSearching(false);
+      if (seq === searchSeqRef.current) setSearching(false);
     }
+  }
+
+  // FIX-2: debounce the search input so a request fires only after the user
+  // pauses typing, not on every keystroke. Any in-flight request is invalidated
+  // as soon as the query changes so stale results never render.
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchSeqRef.current += 1;
+
+    const query = searchQuery.trim();
+    if (!query) {
+      setSearching(false);
+      setSearchError(null);
+      setResults(null);
+      return;
+    }
+
+    setSearching(false);
+    searchDebounceRef.current = setTimeout(() => {
+      void runSearch(query);
+    }, SEARCH_DEBOUNCE_MS);
+  }, [searchQuery]);
+
+  function handleSearch(event: React.FormEvent) {
+    event.preventDefault();
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    void runSearch(searchQuery);
   }
 
   function handleSelectPlace(place: PlaceResult) {
@@ -214,12 +252,22 @@ export function LocationPicker({
             </Button>
           </form>
 
-          {results !== null ? (
-            <ul className="absolute z-[1000] mt-1 w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md">
-              {results.length === 0 ? (
-                <li className="px-3 py-2 text-sm text-muted-foreground">No places found.</li>
+          {searching || results !== null ? (
+            <ul
+              className="absolute z-[1000] mt-1 w-full overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md"
+              aria-busy={searching}
+            >
+              {searching ? (
+                <li className="flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Searching…
+                </li>
+              ) : results !== null && results.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-muted-foreground">
+                  No places found. Try a different name or pick a point on the map.
+                </li>
               ) : (
-                results.map((place) => (
+                results!.map((place) => (
                   <li key={place.placeId ?? place.label}>
                     <button
                       type="button"
