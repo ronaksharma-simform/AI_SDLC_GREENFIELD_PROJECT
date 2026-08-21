@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { isValidUuid } from '@/lib/rides';
 import { closeConversationsForRide } from '@/lib/conversations';
+import { finalizeRideSettlement } from '@/lib/payments';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -62,6 +63,13 @@ export async function POST(_request: Request, { params }: RouteContext) {
     // REQ-6: a completed ride closes its chat conversations — history remains
     // visible but no further messages can be sent.
     await closeConversationsForRide(id);
+
+    // PAY-4: when the Provider declared a trip cost, snapshot the final equal
+    // share onto every currently-Accepted request and freeze the split
+    // (costFinalizedAt). Skipped when no cost was declared (PAY-9).
+    if (ride.totalCost != null) {
+      await finalizeRideSettlement(id);
+    }
 
     return NextResponse.json({ ok: true, ride: completed });
   } catch (error) {

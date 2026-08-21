@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { vehicleId, source, destination, departureTime, seatsTotal, notes } = parsed.data;
+  const { vehicleId, source, destination, departureTime, seatsTotal, notes, totalCost } = parsed.data;
 
   // Section 8 — Validation Rules: a ride's source and destination must not
   // resolve to the same (or a negligibly close) point.
@@ -151,7 +151,10 @@ export async function POST(request: Request) {
         seatsTotal,
         seatsAvailable: seatsTotal,
         status: 'ACTIVE',
-        notes: notes ?? null
+        notes: notes ?? null,
+        // PAY-1: the Provider may optionally declare a trip cost at creation.
+        // Omitted when not supplied so cost-splitting stays inert (PAY-9).
+        ...(totalCost !== undefined ? { totalCost } : {})
       },
       include: { vehicle: true }
     });

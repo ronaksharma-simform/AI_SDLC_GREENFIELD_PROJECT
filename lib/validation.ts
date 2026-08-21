@@ -155,6 +155,49 @@ export const locationInputSchema = z.object({
 export type LocationInput = z.infer<typeof locationInputSchema>;
 
 /**
+ * The Payment & Cost-Splitting module's trip-cost value.
+ *
+ * - Stored/transported in the smallest currency unit (paise) as a whole number.
+ * - Must be a positive amount when provided (§12 — Validation Rules).
+ * - `null` clears a previously-declared cost; `undefined` (only when used with
+ *   `.optional()`) means "leave unchanged" on a partial update.
+ */
+const rideTotalCostField = z.union([
+  z.coerce
+    .number()
+    .int('Trip cost must be a whole number of paise.')
+    .positive('Trip cost must be a positive amount.'),
+  z.null()
+]);
+
+/**
+ * Zod schema for `PATCH /api/rides/{id}/cost`.
+ *
+ * The dedicated endpoint for declaring/updating a ride's optional trip cost.
+ * `totalCost` is required here (a number of paise, or `null` to clear it).
+ * Whether it may change is decided by the route based on `costFinalizedAt`
+ * (once a ride is Completed its split is frozen — PAY-5).
+ */
+export const rideCostSchema = z.object({
+  totalCost: rideTotalCostField
+});
+
+export type RideCostInput = z.infer<typeof rideCostSchema>;
+
+/**
+ * Zod schema for `PATCH /api/requests/{id}/payment`.
+ *
+ * The Provider flips a Seeker's settlement row between Paid and Unpaid. Only the
+ * two enum values are accepted; whether the caller *may* change it is decided by
+ * the route (ride's Provider only — PAY-6).
+ */
+export const paymentStatusUpdateSchema = z.object({
+  paymentStatus: z.enum(['PAID', 'UNPAID'])
+});
+
+export type PaymentStatusUpdateInput = z.infer<typeof paymentStatusUpdateSchema>;
+
+/**
  * Zod schema for `POST /api/rides`.
  *
  * - `vehicleId` must be a UUID. Ownership of the referenced vehicle is verified
@@ -187,7 +230,8 @@ export const rideCreateSchema = z.object({
     .trim()
     .max(RIDE_NOTES_MAX, `Notes must be at most ${RIDE_NOTES_MAX} characters long.`)
     .optional()
-    .transform((value) => (value && value.length > 0 ? value : undefined))
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
+  totalCost: rideTotalCostField.optional()
 });
 
 export type RideCreateInput = z.infer<typeof rideCreateSchema>;
@@ -219,7 +263,8 @@ export const rideUpdateSchema = z.object({
     .max(RIDE_NOTES_MAX, `Notes must be at most ${RIDE_NOTES_MAX} characters long.`)
     .nullable()
     .optional()
-    .transform((value) => (value === undefined ? undefined : value === '' || value === null ? null : value))
+    .transform((value) => (value === undefined ? undefined : value === '' || value === null ? null : value)),
+  totalCost: rideTotalCostField.optional()
 });
 
 export type RideUpdateInput = z.infer<typeof rideUpdateSchema>;

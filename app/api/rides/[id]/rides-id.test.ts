@@ -343,6 +343,43 @@ describe('PATCH /api/rides/{id}', () => {
     expect(mockRideUpdate).not.toHaveBeenCalled();
   });
 
+  it('updates totalCost even when the ride is locked by accepted seats (PAY-1)', async () => {
+    mockRideFindUnique.mockResolvedValue(lockedRide);
+    const updated = { ...lockedRide, totalCost: 15000 };
+    mockRideUpdate.mockResolvedValue(updated);
+
+    const res = await PATCH(
+      makeRequest(JSON.stringify({ totalCost: 15000 }), 'PATCH'),
+      params(RIDE_ID)
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRideUpdate).toHaveBeenCalledWith({
+      where: { id: RIDE_ID },
+      data: { totalCost: 15000 },
+      include: { vehicle: true }
+    });
+  });
+
+  it('rejects a totalCost edit once the ride is completed (split frozen, PAY-5)', async () => {
+    mockRideFindUnique.mockResolvedValue({
+      ...baseRide,
+      status: 'COMPLETED',
+      totalCost: 12000,
+      costFinalizedAt: '2026-08-20T00:00:00.000Z'
+    });
+
+    const res = await PATCH(
+      makeRequest(JSON.stringify({ totalCost: 15000 }), 'PATCH'),
+      params(RIDE_ID)
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toContain('locked');
+    expect(mockRideUpdate).not.toHaveBeenCalled();
+  });
+
   it('applies a full edit (vehicle + seats + fields) when unlocked', async () => {
     mockRideFindUnique.mockResolvedValue(currentRide);
     mockVehicleFindUnique.mockResolvedValue(newVehicle);

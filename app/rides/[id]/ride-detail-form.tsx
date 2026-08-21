@@ -11,6 +11,7 @@ import { Select } from '@/components/ui/select';
 import { Field } from '@/components/field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LocationPicker, type LocationValue } from '@/components/location-picker';
+import { paiseToRupees, rupeesToPaise } from '@/lib/format-money';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -42,6 +43,7 @@ interface RideDetail {
   seatsAvailable: number;
   status: string;
   notes: string | null;
+  totalCost?: number | null;
   vehicleId: string;
   vehicle: {
     id: string;
@@ -111,6 +113,9 @@ export function RideDetailForm({
   const [departureTime, setDepartureTime] = useState(toDatetimeLocal(ride.departureTime));
   const [seatsTotal, setSeatsTotal] = useState(ride.seatsTotal);
   const [notes, setNotes] = useState(ride.notes ?? '');
+  const [totalCost, setTotalCost] = useState(
+    ride.totalCost != null && ride.totalCost > 0 ? paiseToRupees(ride.totalCost).toString() : ''
+  );
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
@@ -140,6 +145,13 @@ export function RideDetailForm({
       payload.vehicleId = vehicleId;
       payload.departureTime = departureTime;
       payload.seatsTotal = seatsTotal;
+    }
+
+    // Trip cost stays editable while the ride is locked by accepted seats
+    // (PAY-1) but is immutable once the ride is completed/cancelled.
+    if (!cancelled) {
+      const totalCostValue = totalCost.trim();
+      payload.totalCost = totalCostValue ? rupeesToPaise(Number(totalCostValue)) : null;
     }
 
     try {
@@ -330,6 +342,26 @@ export function RideDetailForm({
           value={seatsTotal}
           onChange={(event) => setSeatsTotal(Number(event.target.value))}
           aria-invalid={fieldErrors?.seatsTotal ? true : undefined}
+        />
+      </Field>
+
+      <Field
+        label="Trip cost"
+        htmlFor="totalCost"
+        hint="Optional — total fare in ₹. Split equally per person once seats are confirmed."
+        errors={fieldErrors?.totalCost}
+      >
+        <Input
+          id="totalCost"
+          name="totalCost"
+          type="number"
+          min={0.01}
+          step={0.01}
+          placeholder="e.g. 120"
+          disabled={cancelled}
+          value={totalCost}
+          onChange={(event) => setTotalCost(event.target.value)}
+          aria-invalid={fieldErrors?.totalCost ? true : undefined}
         />
       </Field>
 

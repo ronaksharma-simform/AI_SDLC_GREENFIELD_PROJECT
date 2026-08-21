@@ -152,6 +152,27 @@ describe('POST /api/rides', () => {
     });
   });
 
+  it('stores an optional totalCost when the Provider declares one (PAY-1)', async () => {
+    mockVehicleFindUnique.mockResolvedValue(vehicle);
+    mockRideCreate.mockResolvedValue({ ...createdRide, totalCost: 12000 });
+
+    await POST(makeRequest(JSON.stringify({ ...validBody, totalCost: 12000 })));
+
+    expect(mockRideCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ totalCost: 12000 }),
+      include: { vehicle: true }
+    });
+  });
+
+  it('returns 400 for a non-positive totalCost', async () => {
+    const res = await POST(makeRequest(JSON.stringify({ ...validBody, totalCost: 0 })));
+
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.details.totalCost[0]).toContain('positive');
+    expect(mockRideCreate).not.toHaveBeenCalled();
+  });
+
   it('stores null notes when notes are omitted', async () => {
     mockVehicleFindUnique.mockResolvedValue(vehicle);
     mockRideCreate.mockResolvedValue(createdRide);
