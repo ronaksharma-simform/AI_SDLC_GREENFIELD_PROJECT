@@ -159,6 +159,15 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       }
     }
 
+    // PAY-5: once a ride is Completed the split is frozen — totalCost is no
+    // longer editable (a dedicated 409, distinct from the accepted-seat lock).
+    if (input.totalCost !== undefined && ride.costFinalizedAt != null) {
+      return Response.json(
+        { ok: false, error: 'Trip cost is locked because the ride is completed.' },
+        { status: 409 }
+      );
+    }
+
     const data: Prisma.RideUncheckedUpdateInput = {};
 
     if (input.source !== undefined) {
@@ -172,6 +181,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       data.destinationAddress = input.destination.address;
     }
     if (input.notes !== undefined) data.notes = input.notes;
+    if (input.totalCost !== undefined) data.totalCost = input.totalCost;
 
     // Section 8 — Validation Rules: the ride's source and destination must not
     // resolve to the same point. Use the merged value (incoming field if the

@@ -1,13 +1,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockGetSession, mockRideFindUnique, mockRideUpdate, mockConversationUpdateMany } = vi.hoisted(
-  () => ({
-    mockGetSession: vi.fn(),
-    mockRideFindUnique: vi.fn(),
-    mockRideUpdate: vi.fn(),
-    mockConversationUpdateMany: vi.fn()
-  })
-);
+const {
+  mockGetSession,
+  mockRideFindUnique,
+  mockRideUpdate,
+  mockConversationUpdateMany,
+  mockRequestFindMany,
+  mockRequestUpdateMany,
+  mock$transaction
+} = vi.hoisted(() => ({
+  mockGetSession: vi.fn(),
+  mockRideFindUnique: vi.fn(),
+  mockRideUpdate: vi.fn(),
+  mockConversationUpdateMany: vi.fn(),
+  mockRequestFindMany: vi.fn(),
+  mockRequestUpdateMany: vi.fn(),
+  mock$transaction: vi.fn()
+}));
 
 vi.mock('@/lib/auth', () => ({
   getSession: mockGetSession
@@ -19,9 +28,14 @@ vi.mock('@/lib/prisma', () => ({
       findUnique: mockRideFindUnique,
       update: mockRideUpdate
     },
+    rideRequest: {
+      findMany: mockRequestFindMany,
+      updateMany: mockRequestUpdateMany
+    },
     conversation: {
       updateMany: mockConversationUpdateMany
-    }
+    },
+    $transaction: mock$transaction
   }
 }));
 
@@ -63,6 +77,10 @@ describe('POST /api/rides/{id}/complete', () => {
     mockRideUpdate.mockReset();
     mockConversationUpdateMany.mockReset();
     mockConversationUpdateMany.mockResolvedValue({ count: 0 });
+    mockRequestFindMany.mockReset();
+    mockRequestUpdateMany.mockReset();
+    mockRequestUpdateMany.mockResolvedValue({ count: 1 });
+    mock$transaction.mockReset();
     mockGetSession.mockResolvedValue(session);
   });
 
@@ -130,6 +148,39 @@ describe('POST /api/rides/{id}/complete', () => {
       where: { rideId: RIDE_ID, status: 'ACTIVE' },
       data: { status: 'CLOSED', closedAt: expect.any(Date) }
     });
+  });
+
+  it('snapshots the equal share onto every accepted request and freezes the split (PAY-4)', async () => {
+    mockRideFindUnique.mockResolvedValue({ ...baseRide, totalCost: 12000 });
+    const completed = { ...baseRide, totalCost: 12000, status: 'COMPLETED' };
+    mockRideUpdate.mockResolvedValue(completed);
+    mockRequestFindMany.mockResolvedValue([{ id: 'r1' }, { id: 'r2' }]);
+    mock$transaction.mockImplementation((operations: unknown[]) => Promise.resolve(operations));
+
+    const res = await POST(new Request('http://localhost'), params());
+
+    expect(res.status).toBe(200);
+    // ₹120 / (provider + 2 accepted) = 12000/3 = 4000 paise per person.
+    expect(mockRequestUpdateMany).toHaveBeenCalledWith({
+      where: { rideId: RIDE_ID, status: 'ACCEPTED' },
+      data: { shareAmount: 4000 }
+    });
+    // The ride's costFinalizedAt is set in the same atomic transaction.
+    expect(mockRideUpdate).toHaveBeenCalledWith({
+      where: { id: RIDE_ID },
+      data: { costFinalizedAt: expect.any(Date) }
+    });
+  });
+
+  it('does not snapshot a cost split when no totalCost was declared (PAY-9)', async () => {
+    mockRideFindUnique.mockResolvedValue(baseRide);
+    mockRideUpdate.mockResolvedValue({ ...baseRide, status: 'COMPLETED' });
+
+    const res = await POST(new Request('http://localhost'), params());
+
+    expect(res.status).toBe(200);
+    expect(mockRequestFindMany).not.toHaveBeenCalled();
+    expect(mock$transaction).not.toHaveBeenCalled();
   });
 
   it('returns 500 for an unexpected database error', async () => {

@@ -9,6 +9,8 @@ import { isRideLocked } from '@/lib/rides';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CostSplitBadge } from '@/components/cost-split-badge';
+import { SettlementPanel } from '@/components/settlement-panel';
 import { RideDetailForm } from './ride-detail-form';
 
 export const metadata = {
@@ -77,6 +79,7 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
               <Badge variant={statusBadgeVariant(ride.status)}>
                 {STATUS_LABELS[ride.status] ?? ride.status}
               </Badge>
+              <CostSplitBadge rideId={ride.id} />
             </CardTitle>
             <CardDescription>Departure: {formatDateTime(ride.departureTime)}</CardDescription>
           </CardHeader>
@@ -132,6 +135,7 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
                 seatsAvailable: ride.seatsAvailable,
                 status: ride.status,
                 notes: ride.notes,
+                totalCost: ride.totalCost != null ? Number(ride.totalCost) : null,
                 vehicleId: ride.vehicleId,
                 vehicle: ride.vehicle
               }}
@@ -144,6 +148,8 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
             />
           </CardContent>
         </Card>
+
+        {ride.status === 'COMPLETED' ? <SettlementPanel rideId={ride.id} /> : null}
 
         <p className="text-sm text-muted-foreground">
           <Link href="/rides" className="text-primary underline-offset-4 hover:underline">

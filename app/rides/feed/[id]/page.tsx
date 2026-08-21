@@ -11,6 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RequestStatusBadge } from '@/components/request-status-badge';
 import { RequestJoinForm } from '@/components/request-join-form';
+import { CostSplitBadge } from '@/components/cost-split-badge';
+import { MyShareCard } from '@/components/my-share-card';
 
 export const metadata = {
   title: 'Ride details'
@@ -74,6 +76,7 @@ export default async function RideFeedDetailPage({
                 <span className="text-muted-foreground">&rarr;</span>
                 {ride.destinationAddress}
               </span>
+              <CostSplitBadge rideId={ride.id} />
             </CardTitle>
             <CardDescription className="flex items-center gap-1.5">
               <CalendarClock className="h-3.5 w-3.5" />
@@ -162,6 +165,10 @@ export default async function RideFeedDetailPage({
             </AlertDescription>
           </Alert>
         )}
+
+        {activeRequest?.status === 'ACCEPTED' && ride.status === 'COMPLETED' ? (
+          <MyShareCard rideId={ride.id} />
+        ) : null}
       </div>
     </main>
   );

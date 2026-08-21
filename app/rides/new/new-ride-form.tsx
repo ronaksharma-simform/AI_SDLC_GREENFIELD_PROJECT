@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Field } from '@/components/field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LocationPicker, type LocationValue } from '@/components/location-picker';
+import { rupeesToPaise } from '@/lib/format-money';
 
 interface VehicleOption {
   id: string;
@@ -58,7 +59,9 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
     const form = event.currentTarget;
     const formData = new FormData(form);
 
-    const payload = {
+    const totalCostValue = String(formData.get('totalCost') ?? '').trim();
+
+    const payload: Record<string, unknown> = {
       vehicleId: String(formData.get('vehicleId') ?? ''),
       source: toLocationPayload(source),
       destination: toLocationPayload(destination),
@@ -66,6 +69,11 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
       seatsTotal: Number(formData.get('seatsTotal')),
       notes: String(formData.get('notes') ?? '').trim() || undefined
     };
+
+    // Optional trip cost in rupees (PAY-1); the API stores it in paise.
+    if (totalCostValue) {
+      payload.totalCost = rupeesToPaise(Number(totalCostValue));
+    }
 
     try {
       const res = await fetch('/api/rides', {
@@ -180,6 +188,23 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
           max={selectedVehicle?.seatCapacity ?? 1}
           defaultValue={selectedVehicle?.seatCapacity ?? 1}
           aria-invalid={fieldErrors?.seatsTotal ? true : undefined}
+        />
+      </Field>
+
+      <Field
+        label="Trip cost"
+        htmlFor="totalCost"
+        hint="Optional — total fare in ₹. Split equally per person once seats are confirmed."
+        errors={fieldErrors?.totalCost}
+      >
+        <Input
+          id="totalCost"
+          name="totalCost"
+          type="number"
+          min={0.01}
+          step={0.01}
+          placeholder="e.g. 120"
+          aria-invalid={fieldErrors?.totalCost ? true : undefined}
         />
       </Field>
 

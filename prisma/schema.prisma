@@ -44,6 +44,12 @@ enum RideRequestStatus {
   CANCELLED
 }
 
+/// Settlement state for a Seeker's frozen share of a ride's cost split.
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
 enum ConversationStatus {
   ACTIVE
   CLOSED
@@ -111,6 +117,8 @@ model Ride {
   seatsAvailable       Int        @map("seats_available")
   status               RideStatus @default(ACTIVE)
   notes                String?    @db.VarChar(280)
+  totalCost            Decimal?   @map("total_cost") @db.Decimal(12, 2)
+  costFinalizedAt      DateTime?  @map("cost_finalized_at") @db.Timestamptz(6)
   createdAt            DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   reminderSentAt       DateTime?  @map("reminder_sent_at") @db.Timestamptz(6)
@@ -133,6 +141,9 @@ model RideRequest {
   seatsRequested Int               @map("seats_requested")
   status         RideRequestStatus @default(PENDING)
   message        String?           @db.VarChar(280)
+  shareAmount    Decimal?          @map("share_amount") @db.Decimal(12, 2)
+  paymentStatus  PaymentStatus     @default(UNPAID) @map("payment_status")
+  paidAt         DateTime?         @map("paid_at") @db.Timestamptz(6)
   createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   respondedAt    DateTime?         @map("responded_at") @db.Timestamptz(6)
 
