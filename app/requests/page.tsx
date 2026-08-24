@@ -117,7 +117,11 @@ export default async function MyRequestsPage() {
 
                   <div className="mt-4 flex flex-wrap items-center gap-3">
                     <Button asChild variant="outline" size="sm">
-                      <Link href={`/rides/feed/${request.rideId}`}>View ride</Link>
+                      <Link href={`/rides/feed/${request.rideId}`}>
+                        {request.status === 'ACCEPTED' && request.ride.status === 'IN_PROGRESS'
+                          ? 'Track live'
+                          : 'View ride'}
+                      </Link>
                     </Button>
                     {request.status === 'ACCEPTED' ? (
                       (() => {

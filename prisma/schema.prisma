@@ -33,6 +33,7 @@ enum VehicleType {
 enum RideStatus {
   ACTIVE
   FULL
+  IN_PROGRESS
   CANCELLED
   COMPLETED
 }
@@ -61,6 +62,8 @@ enum NotificationType {
   RideRequestRejected
   TripReminder
   NewMessage
+  TripStarted
+  TripCompleted
 }
 
 model User {
@@ -122,16 +125,41 @@ model Ride {
   createdAt            DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
   reminderSentAt       DateTime?  @map("reminder_sent_at") @db.Timestamptz(6)
+  // Trip Start & Live Location Tracking — Provider's most recently reported
+  // position while the trip is In Progress (Section 4.1). The live map reads
+  // these single fields rather than querying the history table (Section 12).
+  currentLatitude      Decimal?   @map("current_latitude") @db.Decimal(9, 6)
+  currentLongitude     Decimal?   @map("current_longitude") @db.Decimal(9, 6)
+  locationUpdatedAt    DateTime?  @map("location_updated_at") @db.Timestamptz(6)
+  startedAt            DateTime?  @map("started_at") @db.Timestamptz(6)
+  completedAt          DateTime?  @map("completed_at") @db.Timestamptz(6)
 
-  provider      User           @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  vehicle       Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  provider      User                @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  vehicle       Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
   requests      RideRequest[]
   conversations Conversation[]
   notifications Notification[]
+  locationSnapshots RideLocationSnapshot[]
 
   @@index([providerId])
   @@index([vehicleId])
   @@map("rides")
+}
+
+/// Trip Location History (Section 4.2) — periodic snapshots of the Provider's
+/// position during an In Progress trip, used for dispute resolution and safety
+/// review after the fact. NOT the source of the live map.
+model RideLocationSnapshot {
+  id         String   @id @default(uuid()) @db.Uuid
+  rideId     String   @map("ride_id") @db.Uuid
+  latitude   Decimal  @db.Decimal(9, 6)
+  longitude  Decimal  @db.Decimal(9, 6)
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId, recordedAt])
+  @@map("ride_location_snapshots")
 }
 
 model RideRequest {

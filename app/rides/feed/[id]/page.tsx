@@ -14,9 +14,18 @@ import { RequestStatusBadge } from '@/components/request-status-badge';
 import { RequestJoinDialog } from '@/components/request-join-dialog';
 import { CostSplitBadge } from '@/components/cost-split-badge';
 import { MyShareCard } from '@/components/my-share-card';
+import { LiveTripView } from '@/components/live-trip-view';
 
 export const metadata = {
   title: 'Ride details'
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Active',
+  FULL: 'Full',
+  IN_PROGRESS: 'In Progress',
+  CANCELLED: 'Cancelled',
+  COMPLETED: 'Completed'
 };
 
 export default async function RideFeedDetailPage({
@@ -116,7 +125,9 @@ export default async function RideFeedDetailPage({
                   <ShieldCheck className="h-3.5 w-3.5" />
                   Status
                 </dt>
-                <dd className="mt-0.5 font-medium">{ride.status}</dd>
+                <dd className="mt-0.5 font-medium">
+                  {STATUS_LABELS[ride.status] ?? ride.status}
+                </dd>
               </div>
               {ride.notes ? (
                 <div className="sm:col-span-2">
@@ -169,6 +180,30 @@ export default async function RideFeedDetailPage({
             </AlertDescription>
           </Alert>
         )}
+
+        {activeRequest?.status === 'ACCEPTED' &&
+        (ride.status === 'IN_PROGRESS' || ride.status === 'COMPLETED') ? (
+          <LiveTripView
+            rideId={ride.id}
+            initial={{
+              id: ride.id,
+              status: ride.status,
+              startedAt: ride.startedAt ? ride.startedAt.toISOString() : null,
+              completedAt: ride.completedAt ? ride.completedAt.toISOString() : null,
+              currentLatitude: ride.currentLatitude != null ? Number(ride.currentLatitude) : null,
+              currentLongitude: ride.currentLongitude != null ? Number(ride.currentLongitude) : null,
+              locationUpdatedAt: ride.locationUpdatedAt
+                ? ride.locationUpdatedAt.toISOString()
+                : null,
+              sourceLatitude: ride.sourceLatitude != null ? Number(ride.sourceLatitude) : null,
+              sourceLongitude: ride.sourceLongitude != null ? Number(ride.sourceLongitude) : null,
+              destinationLatitude:
+                ride.destinationLatitude != null ? Number(ride.destinationLatitude) : null,
+              destinationLongitude:
+                ride.destinationLongitude != null ? Number(ride.destinationLongitude) : null
+            }}
+          />
+        ) : null}
 
         {activeRequest?.status === 'ACCEPTED' && ride.status === 'COMPLETED' ? (
           <MyShareCard rideId={ride.id} />

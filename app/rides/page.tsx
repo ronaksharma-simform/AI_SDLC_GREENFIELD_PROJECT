@@ -24,6 +24,7 @@ export const metadata = {
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Active',
   FULL: 'Full',
+  IN_PROGRESS: 'In Progress',
   CANCELLED: 'Cancelled',
   COMPLETED: 'Completed'
 };
@@ -34,6 +35,8 @@ function statusBadgeVariant(status: string): 'success' | 'warning' | 'destructiv
       return 'success';
     case 'FULL':
       return 'warning';
+    case 'IN_PROGRESS':
+      return 'secondary';
     case 'CANCELLED':
       return 'destructive';
     default:

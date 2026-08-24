@@ -24,6 +24,8 @@ describe('buildNotificationTitle', () => {
     expect(buildNotificationTitle('RideRequestAccepted')).toBe('Request accepted');
     expect(buildNotificationTitle('TripReminder')).toBe('Trip reminder');
     expect(buildNotificationTitle('NewMessage')).toBe('New message');
+    expect(buildNotificationTitle('TripStarted')).toBe('Trip started');
+    expect(buildNotificationTitle('TripCompleted')).toBe('Trip completed');
   });
 });
 
@@ -51,6 +53,18 @@ describe('buildNotificationMessage', () => {
   it('builds the New Message message with the sender name', () => {
     expect(buildNotificationMessage('NewMessage', { senderName: 'Amit' })).toBe(
       'New message from Amit'
+    );
+  });
+
+  it('builds the Trip Started message with the destination', () => {
+    expect(buildNotificationMessage('TripStarted', { destinationAddress: 'Office' })).toBe(
+      'Your ride to Office is on the way'
+    );
+  });
+
+  it('builds the Trip Completed message with the destination', () => {
+    expect(buildNotificationMessage('TripCompleted', { destinationAddress: 'Airport' })).toBe(
+      'Your ride to Airport is complete'
     );
   });
 });

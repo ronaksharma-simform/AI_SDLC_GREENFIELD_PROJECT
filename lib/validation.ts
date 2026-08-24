@@ -270,6 +270,27 @@ export const rideUpdateSchema = z.object({
 export type RideUpdateInput = z.infer<typeof rideUpdateSchema>;
 
 /**
+ * Zod schema for `POST /api/rides/{id}/location`.
+ *
+ * The Provider's device reports a fresh position while the trip is In Progress.
+ * Both coordinates are required and bounded to valid coordinate ranges
+ * (Section 11 — Validation Rules). Rate-limiting is applied in the route based
+ * on the ride's last `locationUpdatedAt`, not here.
+ */
+export const locationUpdateSchema = z.object({
+  latitude: z.coerce
+    .number()
+    .min(-90, 'Latitude must be between -90 and 90.')
+    .max(90, 'Latitude must be between -90 and 90.'),
+  longitude: z.coerce
+    .number()
+    .min(-180, 'Longitude must be between -180 and 180.')
+    .max(180, 'Longitude must be between -180 and 180.')
+});
+
+export type LocationUpdateInput = z.infer<typeof locationUpdateSchema>;
+
+/**
  * Zod schema for `POST /api/rides/{id}/requests`.
  *
  * - `seatsRequested` is coerced from a number or numeric string and must be a

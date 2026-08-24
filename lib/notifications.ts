@@ -34,7 +34,9 @@ const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   RideRequestAccepted: 'Request accepted',
   RideRequestRejected: 'Request rejected',
   TripReminder: 'Trip reminder',
-  NewMessage: 'New message'
+  NewMessage: 'New message',
+  TripStarted: 'Trip started',
+  TripCompleted: 'Trip completed'
 };
 
 /**
@@ -57,6 +59,10 @@ export function buildNotificationMessage(type: NotificationType, ctx: NotifyCont
       return `Your ride to ${ctx.destinationAddress ?? 'your destination'} departs in 15 minutes`;
     case 'NewMessage':
       return `New message from ${ctx.senderName ?? 'a rider'}`;
+    case 'TripStarted':
+      return `Your ride to ${ctx.destinationAddress ?? 'your destination'} is on the way`;
+    case 'TripCompleted':
+      return `Your ride to ${ctx.destinationAddress ?? 'your destination'} is complete`;
   }
 }
 
