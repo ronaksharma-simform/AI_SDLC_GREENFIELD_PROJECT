@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Send, TriangleAlert } from 'lucide-react';
+import { ArrowLeft, Loader2, Send, TriangleAlert, User } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { RouteLine } from '@/components/route-line';
 
 export interface ConversationMessage {
   id: string;
@@ -141,19 +142,37 @@ export function ConversationView({
   return (
     <main className="container py-10">
       <div className="mx-auto flex max-w-2xl flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <Button asChild variant="ghost" size="icon" aria-label="Back to messages">
-            <Link href="/messages">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div className="min-w-0">
-            <h1 className="truncate text-lg font-semibold">
-              {otherParticipant.name ?? otherParticipant.email}
-            </h1>
-            <p className="truncate text-sm text-muted-foreground">
-              {ride.sourceAddress} <span>&rarr;</span> {ride.destinationAddress}
-            </p>
+        <div className="rounded-xl border border-primary/20 bg-gradient-brand-soft p-4">
+          <div className="flex items-center gap-3">
+            <Button asChild variant="ghost" size="icon" aria-label="Back to messages">
+              <Link href="/messages">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            </Button>
+            {/* Two avatars joined by the route-line motif — "you ↔ them" (Section 5.12). */}
+            <div className="flex min-w-0 flex-1 items-center gap-2.5">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+                aria-hidden="true"
+              >
+                <User className="h-4 w-4" />
+              </span>
+              <RouteLine size="sm" dashed className="w-12 shrink-0" />
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-coral text-sm font-semibold text-coral-foreground"
+                aria-hidden="true"
+              >
+                {(otherParticipant.name ?? otherParticipant.email).charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <h1 className="truncate text-lg font-semibold">
+                  {otherParticipant.name ?? otherParticipant.email}
+                </h1>
+                <p className="truncate text-sm text-muted-foreground">
+                  {ride.sourceAddress} <span>&rarr;</span> {ride.destinationAddress}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -176,7 +195,7 @@ export function ConversationView({
                         'max-w-[80%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm',
                         own
                           ? 'rounded-br-sm bg-primary text-primary-foreground'
-                          : 'rounded-bl-sm bg-secondary text-secondary-foreground'
+                          : 'rounded-bl-sm bg-cloud text-foreground'
                       )}
                     >
                       {message.content}

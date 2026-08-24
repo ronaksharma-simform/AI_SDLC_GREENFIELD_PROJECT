@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { RouteLine } from '@/components/route-line';
 import { LocationPicker, type LocationValue } from '@/components/location-picker';
 import { buildRideFeedQuery } from '@/lib/ride-feed';
 import { formatDateTime } from '@/lib/format-date';
@@ -61,14 +62,21 @@ interface FeedFilters {
 
 const EMPTY_FILTERS: FeedFilters = { source: null, destination: null, time: '', seats: '' };
 
-/** Loading placeholder shown while results are fetched (Part A §4). */
+/**
+ * Loading placeholder — a pulsing, dashed grayscale route line instead of
+ * generic gray bars, echoing the signature motif (Section 5.8).
+ */
 function RideCardSkeleton() {
   return (
-    <Card className="animate-pulse">
-      <CardContent className="space-y-3 p-5">
-        <div className="h-4 w-2/3 rounded bg-muted" />
-        <div className="h-3 w-1/2 rounded bg-muted" />
+    <Card className="animate-pulse" aria-hidden="true">
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-center gap-2">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-muted" />
+          <span className="h-[3px] flex-1 rounded-full route-line-skeleton" />
+          <span className="h-2 w-2 shrink-0 rounded-full bg-muted" />
+        </div>
         <div className="h-3 w-1/3 rounded bg-muted" />
+        <div className="h-3 w-1/2 rounded bg-muted" />
       </CardContent>
     </Card>
   );
@@ -78,18 +86,18 @@ function RideCard({ ride }: { ride: RideFeedItem }) {
   return (
     <Card hover>
       <CardContent className="p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 font-medium">
-              <span className="truncate">{ride.sourceAddress}</span>
-              <span className="text-muted-foreground">&rarr;</span>
-              <span className="truncate">{ride.destinationAddress}</span>
-            </div>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-              <CalendarClock className="h-3.5 w-3.5" />
-              {formatDateTime(ride.departureTime)}
-            </p>
-          </div>
+        {/* The ride feed is the primary showcase of the route-line motif. */}
+        <RouteLine
+          source={ride.sourceAddress}
+          destination={ride.destinationAddress}
+          size="sm"
+          dashed
+        />
+        <div className="mt-3 flex items-start justify-between gap-3">
+          <p className="flex items-center gap-1.5 font-mono text-sm text-muted-foreground">
+            <CalendarClock className="h-3.5 w-3.5" />
+            {formatDateTime(ride.departureTime)}
+          </p>
           <Badge variant="outline">
             {ride.seatsAvailable} of {ride.seatsTotal} seats
           </Badge>
@@ -293,10 +301,8 @@ export function RideFeed() {
           </div>
         ) : rides && rides.length === 0 ? (
           <Card>
-            <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
-              <span className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
-                <CalendarClock className="h-6 w-6" />
-              </span>
+            <CardContent className="flex flex-col items-center gap-4 py-16 text-center">
+              <RouteLine dashed className="max-w-[220px]" />
               <div>
                 <h2 className="text-lg font-semibold">No rides match your filters</h2>
                 <p className="mt-1 text-sm text-muted-foreground">

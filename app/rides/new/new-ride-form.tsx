@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select';
 import { Field } from '@/components/field';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LocationPicker, type LocationValue } from '@/components/location-picker';
+import { RouteLine } from '@/components/route-line';
 import { rupeesToPaise } from '@/lib/format-money';
 
 interface VehicleOption {
@@ -43,11 +44,32 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
 
   const [source, setSource] = useState<LocationValue | null>(null);
   const [destination, setDestination] = useState<LocationValue | null>(null);
+  const [departureTime, setDepartureTime] = useState('');
+  const [seatsTotal, setSeatsTotal] = useState<string>(String(firstVehicle?.seatCapacity ?? 1));
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Submit stays disabled until every required field is present and valid
+  // (Section 5.7): a vehicle, both resolved locations, a departure time, and a
+  // positive seat count.
+  const formValid = Boolean(
+    vehicleId &&
+      source &&
+      destination &&
+      departureTime &&
+      Number(seatsTotal) > 0 &&
+      Number(seatsTotal) <= (selectedVehicle?.seatCapacity ?? Number.MAX_SAFE_INTEGER)
+  );
+
+  function handleVehicleChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const nextId = event.target.value;
+    setVehicleId(nextId);
+    const nextVehicle = vehicles.find((vehicle) => vehicle.id === nextId);
+    if (nextVehicle) setSeatsTotal(String(nextVehicle.seatCapacity));
+  }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -123,13 +145,21 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
         </Alert>
       ) : null}
 
+      {/* Live route-line preview (Section 5.7): appears as soon as both
+          locations resolve, showing the route that's about to be created. */}
+      {source && destination ? (
+        <div className="rounded-xl border border-primary/20 bg-gradient-brand-soft p-4">
+          <RouteLine source={source.address} destination={destination.address} size="md" dashed />
+        </div>
+      ) : null}
+
       <Field label="Vehicle" htmlFor="vehicleId" required errors={fieldErrors?.vehicleId}>
         <Select
           id="vehicleId"
           name="vehicleId"
           required
           value={vehicleId}
-          onChange={(event) => setVehicleId(event.target.value)}
+          onChange={handleVehicleChange}
           aria-invalid={fieldErrors?.vehicleId ? true : undefined}
         >
           {vehicles.map((vehicle) => (
@@ -164,6 +194,8 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
           name="departureTime"
           type="datetime-local"
           required
+          value={departureTime}
+          onChange={(event) => setDepartureTime(event.target.value)}
           aria-invalid={fieldErrors?.departureTime ? true : undefined}
         />
       </Field>
@@ -186,7 +218,8 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
           required
           min={1}
           max={selectedVehicle?.seatCapacity ?? 1}
-          defaultValue={selectedVehicle?.seatCapacity ?? 1}
+          value={seatsTotal}
+          onChange={(event) => setSeatsTotal(event.target.value)}
           aria-invalid={fieldErrors?.seatsTotal ? true : undefined}
         />
       </Field>
@@ -224,9 +257,14 @@ export function NewRideForm({ vehicles }: { vehicles: VehicleOption[] }) {
         />
       </Field>
 
-      <Button type="submit" disabled={loading} size="lg" className="w-full sm:w-auto">
+      <Button type="submit" disabled={loading || !formValid} size="lg" className="w-full sm:w-auto">
         {loading ? 'Publishing…' : 'Offer ride'}
       </Button>
+      {!formValid ? (
+        <p className="text-xs text-muted-foreground">
+          Choose a vehicle, source and destination, departure time, and seat count to publish.
+        </p>
+      ) : null}
     </form>
   );
 }

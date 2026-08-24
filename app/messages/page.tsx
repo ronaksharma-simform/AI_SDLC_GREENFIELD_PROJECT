@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { RouteLine } from '@/components/route-line';
 
 export const metadata = {
   title: 'Messages'
@@ -140,9 +141,12 @@ export default async function MessagesPage() {
                               <Badge variant="default">New</Badge>
                             ) : null}
                           </div>
-                          <p className="mt-0.5 truncate text-sm text-muted-foreground">
-                            {item.ride.sourceAddress} <span>&rarr;</span>{' '}
-                            {item.ride.destinationAddress}
+                          <p className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
+                            <RouteLine size="sm" dashed className="w-10 shrink-0" />
+                            <span className="truncate">
+                              {item.ride.sourceAddress} <span>&rarr;</span>{' '}
+                              {item.ride.destinationAddress}
+                            </span>
                           </p>
                           <p
                             className={cn(

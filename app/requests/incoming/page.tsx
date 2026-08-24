@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RequestSubNav } from '@/components/request-sub-nav';
 import { RequestStatusBadge } from '@/components/request-status-badge';
 import { RespondRequestButtons } from '@/components/respond-request-buttons';
+import { RouteLine } from '@/components/route-line';
 
 export const metadata = {
   title: 'Incoming requests'
@@ -99,66 +100,107 @@ export default async function IncomingRequestsPage() {
           </Card>
         ) : (
           <div className="space-y-8">
-            {ridesWithRequests.map((ride) => (
-              <section key={ride.id} aria-label={`Requests for ${ride.sourceAddress} to ${ride.destinationAddress}`}>
-                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-                  <h2 className="font-semibold">
-                    {ride.sourceAddress}{' '}
-                    <span className="text-muted-foreground">&rarr;</span>{' '}
-                    {ride.destinationAddress}
-                  </h2>
-                  <span className="text-sm text-muted-foreground">
+            {ridesWithRequests.map((ride) => {
+              const pendingRequests = ride.requests.filter(
+                (request) => request.status === 'PENDING'
+              );
+              const respondedRequests = ride.requests.filter(
+                (request) => request.status !== 'PENDING'
+              );
+
+              return (
+                <section key={ride.id} aria-label={`Requests for ${ride.sourceAddress} to ${ride.destinationAddress}`}>
+                  <div className="rounded-xl border border-primary/20 bg-gradient-brand-soft p-3">
+                    <RouteLine
+                      source={ride.sourceAddress}
+                      destination={ride.destinationAddress}
+                      size="md"
+                      dashed
+                    />
+                  </div>
+                  <div className="mb-3 mt-1 text-sm text-muted-foreground">
                     Departs {formatDateTime(ride.departureTime)}
-                  </span>
-                </div>
+                  </div>
 
-                <div className="space-y-3">
-                  {ride.requests.map((request) => (
-                    <Card key={request.id}>
-                      <CardContent className="p-5">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="font-medium">
-                              {request.seeker.name ?? request.seeker.email}
-                            </div>
-                            <div className="mt-1 text-sm text-muted-foreground">
-                              {request.seatsRequested} seat(s) requested
-                              {request.message ? (
-                                <span> &middot; &ldquo;{request.message}&rdquo;</span>
-                              ) : null}
-                            </div>
-                          </div>
-                          <RequestStatusBadge status={request.status} />
-                        </div>
-
-                        {/* Only pending requests are actionable. Responded ones
-                            stay visible with their status badge but lose the
-                            action buttons (Part A §7). */}
-                        {request.status === 'ACCEPTED' ? (
-                          (() => {
-                            const conversationId = conversationIdByPair.get(
-                              `${ride.id}:${session.user.id}:${request.seeker.id}`
-                            );
-                            return conversationId ? (
-                              <div className="mt-3">
-                                <Button asChild size="sm">
-                                  <Link href={`/messages/${conversationId}`}>
-                                    Message {request.seeker.name ?? request.seeker.email}
-                                  </Link>
-                                </Button>
+                  {/* Actionable requests — pending ones keep the respond buttons. */}
+                  <div className="space-y-3">
+                    {pendingRequests.map((request) => (
+                      <Card key={request.id}>
+                        <CardContent className="p-5">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium">
+                                {request.seeker.name ?? request.seeker.email}
                               </div>
-                            ) : null;
-                          })()
-                        ) : null}
-                        {request.status === 'PENDING' ? (
+                              <div className="mt-1 text-sm text-muted-foreground">
+                                {request.seatsRequested} seat(s) requested
+                                {request.message ? (
+                                  <span> &middot; &ldquo;{request.message}&rdquo;</span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <RequestStatusBadge status={request.status} />
+                          </div>
                           <RespondRequestButtons requestId={request.id} />
-                        ) : null}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            ))}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {/* Already-handled requests stay visible in a muted section
+                      with their status badge but without action buttons
+                      (Part A §7). */}
+                  {respondedRequests.length > 0 ? (
+                    <div className="mt-4">
+                      <div className="mb-2 flex items-center gap-2">
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Responded
+                        </h3>
+                        <span className="h-px flex-1 bg-border" />
+                      </div>
+                      <div className="space-y-3">
+                        {respondedRequests.map((request) => (
+                          <Card key={request.id} className="opacity-75">
+                            <CardContent className="p-5">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="font-medium">
+                                    {request.seeker.name ?? request.seeker.email}
+                                  </div>
+                                  <div className="mt-1 text-sm text-muted-foreground">
+                                    {request.seatsRequested} seat(s) requested
+                                    {request.message ? (
+                                      <span> &middot; &ldquo;{request.message}&rdquo;</span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                                <RequestStatusBadge status={request.status} />
+                              </div>
+                              {request.status === 'ACCEPTED' ? (
+                                (() => {
+                                  const conversationId = conversationIdByPair.get(
+                                    `${ride.id}:${session.user.id}:${request.seeker.id}`
+                                  );
+                                  return conversationId ? (
+                                    <div className="mt-3">
+                                      <Button asChild size="sm">
+                                        <Link href={`/messages/${conversationId}`}>
+                                          Message {request.seeker.name ?? request.seeker.email}
+                                        </Link>
+                                      </Button>
+                                    </div>
+                                  ) : null;
+                                })()
+                              ) : null}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })}
           </div>
         )}
       </div>

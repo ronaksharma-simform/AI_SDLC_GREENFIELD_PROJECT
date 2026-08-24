@@ -1,16 +1,17 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { CalendarClock, MapPin, ShieldCheck, Users } from 'lucide-react';
+import { ShieldCheck, Users } from 'lucide-react';
 
 import { getSession } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { formatDateTime } from '@/lib/format-date';
 import { vehicleTypeLabel } from '@/lib/vehicle';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RouteLine } from '@/components/route-line';
 import { RequestStatusBadge } from '@/components/request-status-badge';
-import { RequestJoinForm } from '@/components/request-join-form';
+import { RequestJoinDialog } from '@/components/request-join-dialog';
 import { CostSplitBadge } from '@/components/cost-split-badge';
 import { MyShareCard } from '@/components/my-share-card';
 
@@ -68,22 +69,25 @@ export default async function RideFeedDetailPage({
         </header>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2 text-lg">
-              <span className="flex items-center gap-2">
-                <MapPin className="h-4 w-4 text-muted-foreground" />
-                {ride.sourceAddress}
-                <span className="text-muted-foreground">&rarr;</span>
-                {ride.destinationAddress}
-              </span>
+          <CardContent className="p-6">
+            {/* The route line rendered large and centered, with the departure
+                time in the mono data type beneath (Section 5.9). */}
+            <div className="rounded-xl border border-primary/20 bg-gradient-brand-soft p-6">
+              <RouteLine
+                source={ride.sourceAddress}
+                destination={ride.destinationAddress}
+                size="lg"
+                dashed
+              />
+              <p className="mt-4 text-center font-mono text-sm text-muted-foreground">
+                Departs {formatDateTime(ride.departureTime)}
+              </p>
+            </div>
+            <div className="mt-4 flex justify-center">
               <CostSplitBadge rideId={ride.id} />
-            </CardTitle>
-            <CardDescription className="flex items-center gap-1.5">
-              <CalendarClock className="h-3.5 w-3.5" />
-              Departs {formatDateTime(ride.departureTime)}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+            </div>
+          </CardContent>
+          <CardContent className="pt-0">
             <dl className="grid gap-4 sm:grid-cols-2">
               <div>
                 <dt className="text-sm text-muted-foreground">Provider</dt>
@@ -156,7 +160,7 @@ export default async function RideFeedDetailPage({
             </AlertDescription>
           </Alert>
         ) : requestable ? (
-          <RequestJoinForm rideId={ride.id} seatsAvailable={ride.seatsAvailable} />
+          <RequestJoinDialog rideId={ride.id} seatsAvailable={ride.seatsAvailable} />
         ) : (
           <Alert variant="warning">
             <AlertTitle>Not accepting requests</AlertTitle>
