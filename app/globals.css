@@ -3,12 +3,17 @@
 @tailwind utilities;
 
 /*
- * CoRide design tokens.
+ * CoRide design tokens — "Commute Gradient" system.
  *
- * All component colours are defined here as HSL custom properties and consumed
- * through the Tailwind theme (`tailwind.config.ts`). Changing a token here
- * updates the entire app — buttons, inputs, cards, badges, alerts — in one
- * place. Light and dark themes share the same structure.
+ * The visual identity is a bold indigo → coral gradient. All component colours
+ * are defined here as HSL custom properties and consumed through the Tailwind
+ * theme (`tailwind.config.ts`). Changing a token here updates the entire app —
+ * buttons, inputs, cards, badges, alerts — in one place. Light and dark themes
+ * share the same structure.
+ *
+ * Brand gradient stops are exposed as `--brand-from` / `--brand-to` and reused
+ * by the `text-gradient-brand` / `bg-gradient-brand` utilities below, plus the
+ * Three.js hero scene (which reads the same hues for its lights and fog).
  */
 @layer base {
   :root {
@@ -18,14 +23,14 @@
     --card-foreground: 240 10% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
-    --primary: 243 75% 59%;
+    --primary: 245 78% 58%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 244 70% 96%;
+    --secondary-foreground: 245 60% 28%;
     --muted: 240 4.8% 95.9%;
     --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 244 70% 96%;
+    --accent-foreground: 245 65% 32%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --success: 160 84% 39%;
@@ -34,34 +39,42 @@
     --success-muted-foreground: 158 64% 24%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
-    --radius: 0.5rem;
+    --ring: 245 85% 60%;
+    --coral: 15 88% 58%;
+    --coral-foreground: 0 0% 100%;
+    --brand-from: 245 85% 58%;
+    --brand-to: 15 90% 58%;
+    --radius: 0.75rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    --background: 242 40% 6%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
+    --card: 242 35% 9%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
+    --popover: 242 35% 9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 243 75% 64%;
+    --primary: 245 78% 62%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 3.7% 15.9%;
+    --secondary: 242 30% 14%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
+    --muted: 242 30% 14%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --accent: 245 40% 22%;
+    --accent-foreground: 245 90% 86%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --success: 160 84% 45%;
     --success-foreground: 0 0% 100%;
     --success-muted: 158 50% 15%;
     --success-muted-foreground: 152 60% 75%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 242 30% 16%;
+    --input: 242 30% 16%;
+    --ring: 245 85% 72%;
+    --coral: 15 90% 62%;
+    --coral-foreground: 0 0% 100%;
+    --brand-from: 245 82% 62%;
+    --brand-to: 15 90% 58%;
   }
 }
 
@@ -72,6 +85,10 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    /* Subtle indigo/coral mesh so the gradient identity persists behind every page. */
+    background-image:
+      radial-gradient(55rem 34rem at 112% -12%, hsl(var(--brand-from) / 0.12), transparent 60%),
+      radial-gradient(48rem 30rem at -12% 0%, hsl(var(--brand-to) / 0.1), transparent 55%);
     font-feature-settings:
       'rlig' 1,
       'calt' 1;
@@ -80,5 +97,119 @@
   /* Consistent focus ring for keyboard users across every interactive element. */
   :focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Brand gradient helpers shared across the app and the 3D hero. */
+@layer utilities {
+  .text-gradient-brand {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(120deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+  }
+
+  .text-gradient-brand-animated {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      120deg,
+      hsl(var(--brand-from)),
+      hsl(var(--brand-to)),
+      hsl(var(--brand-from))
+    );
+    background-size: 200% auto;
+    animation: gradient-x 9s linear infinite;
+  }
+
+  .bg-gradient-brand {
+    background-image: linear-gradient(120deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+  }
+
+  .bg-gradient-brand-soft {
+    background-image: linear-gradient(
+      120deg,
+      hsl(var(--brand-from) / 0.12),
+      hsl(var(--brand-to) / 0.12)
+    );
+  }
+
+  /* Glossy highlight for gradient surfaces (buttons / hero chips). */
+  .bg-gradient-brand-shine {
+    background-image:
+      linear-gradient(
+        120deg,
+        hsl(var(--brand-from)),
+        hsl(var(--brand-to))
+      ),
+      linear-gradient(
+        105deg,
+        transparent 40%,
+        hsl(0 0% 100% / 0.18) 50%,
+        transparent 60%
+      );
+    background-blend-mode: normal, overlay;
+  }
+
+  /* Animated dashed route-line motif used in the hero and section dividers. */
+  .route-dash {
+    stroke-dasharray: 2 10;
+    animation: route-dash 1.4s linear infinite;
+  }
+}
+
+/* Keyframes referenced by utilities above and by Tailwind `animate-*` helpers. */
+@keyframes gradient-x {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes route-dash {
+  to {
+    stroke-dashoffset: -12;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes fade-up {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Respect users who prefer reduced motion: disable decorative animation. */
+@media (prefers-reduced-motion: reduce) {
+  .text-gradient-brand-animated,
+  .route-dash,
+  .animate-float,
+  .animate-fade-up,
+  .animate-pulse-soft {
+    animation: none !important;
   }
 }
