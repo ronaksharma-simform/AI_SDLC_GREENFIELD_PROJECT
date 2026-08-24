@@ -256,6 +256,19 @@
   }
 }
 
+/* Pulsing ring behind the live-trip map's moving Provider marker. */
+@keyframes coride-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
 /* Respect users who prefer reduced motion: disable decorative animation. */
 @media (prefers-reduced-motion: reduce) {
   .text-gradient-brand-animated,
@@ -266,5 +279,10 @@
   .animate-fade-up,
   .animate-pulse-soft {
     animation: none !important;
+  }
+
+  [style*='coride-ping'] {
+    animation: none !important;
+    opacity: 0.35;
   }
 }

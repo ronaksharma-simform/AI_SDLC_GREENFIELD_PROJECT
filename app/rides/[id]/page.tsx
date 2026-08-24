@@ -11,6 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CostSplitBadge } from '@/components/cost-split-badge';
 import { SettlementPanel } from '@/components/settlement-panel';
+import { ProviderTripControl } from '@/components/provider-trip-control';
 import { RideDetailForm } from './ride-detail-form';
 
 export const metadata = {
@@ -20,6 +21,7 @@ export const metadata = {
 const STATUS_LABELS: Record<string, string> = {
   ACTIVE: 'Active',
   FULL: 'Full',
+  IN_PROGRESS: 'In Progress',
   CANCELLED: 'Cancelled',
   COMPLETED: 'Completed'
 };
@@ -30,6 +32,8 @@ function statusBadgeVariant(status: string): 'success' | 'warning' | 'destructiv
       return 'success';
     case 'FULL':
       return 'warning';
+    case 'IN_PROGRESS':
+      return 'secondary';
     case 'CANCELLED':
       return 'destructive';
     default:
@@ -59,7 +63,9 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
     orderBy: { createdAt: 'asc' }
   });
 
-  const locked = isRideLocked(ride);
+  // Core details are locked once a seat has been accepted, and the whole ride is
+  // locked while a trip is In Progress (no edits mid-trip).
+  const locked = isRideLocked(ride) || ride.status === 'IN_PROGRESS';
 
   return (
     <main className="container py-10">
@@ -108,13 +114,19 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
           </CardContent>
         </Card>
 
+        <ProviderTripControl
+          rideId={ride.id}
+          status={ride.status}
+          departureTime={ride.departureTime.toISOString()}
+        />
+
         {locked ? (
           <Alert variant="warning">
             <TriangleAlert className="h-4 w-4" />
             <AlertTitle>Ride locked</AlertTitle>
             <AlertDescription>
-              This ride is locked because a seat has already been accepted. Vehicle, seat count, and
-              departure time can no longer be changed.
+              This ride is locked because a seat has been accepted or the trip is in progress.
+              Vehicle, seat count, and departure time can no longer be changed.
             </AlertDescription>
           </Alert>
         ) : null}

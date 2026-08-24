@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { isValidUuid } from '@/lib/rides';
+import { canCompleteTrip } from '@/lib/trip-tracking';
 import { closeConversationsForRide } from '@/lib/conversations';
 import { finalizeRideSettlement } from '@/lib/payments';
+import { notifyUser } from '@/lib/notifications';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -12,18 +14,22 @@ type RouteContext = { params: Promise<{ id: string }> };
  *
  * Provider-only: marks one of the caller's rides as Completed.
  *
- * Completing a ride is a status change, never a deletion — ride history is
- * preserved. Any chat conversations for the ride are closed (REQ-6): the
- * message history stays visible but the conversation stops accepting new
- * messages. Completing an already-completed ride is a no-op; a cancelled ride
- * cannot be completed.
+ * A trip can only be completed from the In Progress state (Section 11 —
+ * Validation Rules): completing a ride that has not been started is rejected.
+ * Completing stops location broadcasting immediately and unconditionally
+ * (REQ-7), closes the ride's chat conversations (REQ-6), freezes any declared
+ * cost split (PAY-4), and notifies every Accepted Seeker that the trip is
+ * complete (Section 10.4).
+ *
+ * Completing an already-completed ride is a no-op; a cancelled ride cannot be
+ * completed.
  *
  * Responses:
  *   - 200 { ok: true, ride }        on success (ride.status === COMPLETED)
  *   - 400 { ok: false, error }      malformed ride id
  *   - 401 { ok: false, error }      no valid session
  *   - 404 { ok: false, error }      ride not found / not owned by the caller
- *   - 409 { ok: false, error }      the ride is already cancelled
+ *   - 409 { ok: false, error }      the ride is cancelled or has not started
  *   - 500 { ok: false, error }      unexpected failure
  */
 export async function POST(_request: Request, { params }: RouteContext) {
@@ -55,9 +61,16 @@ export async function POST(_request: Request, { params }: RouteContext) {
       );
     }
 
+    if (!canCompleteTrip(ride.status)) {
+      return Response.json(
+        { ok: false, error: 'A trip can only be completed after it has started.' },
+        { status: 409 }
+      );
+    }
+
     const completed = await prisma.ride.update({
       where: { id },
-      data: { status: 'COMPLETED' }
+      data: { status: 'COMPLETED', completedAt: new Date() }
     });
 
     // REQ-6: a completed ride closes its chat conversations — history remains
@@ -70,6 +83,21 @@ export async function POST(_request: Request, { params }: RouteContext) {
     if (ride.totalCost != null) {
       await finalizeRideSettlement(id);
     }
+
+    // Section 10.4: every Accepted Seeker is notified the trip is complete.
+    const acceptedRequests = await prisma.rideRequest.findMany({
+      where: { rideId: id, status: 'ACCEPTED' },
+      select: { seekerId: true }
+    });
+
+    await Promise.all(
+      acceptedRequests.map((request) =>
+        notifyUser(request.seekerId, 'TripCompleted', {
+          rideId: id,
+          destinationAddress: ride.destinationAddress
+        })
+      )
+    );
 
     return NextResponse.json({ ok: true, ride: completed });
   } catch (error) {

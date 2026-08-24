@@ -388,31 +388,34 @@ export function RideDetailForm({
           {loading ? 'Saving…' : 'Save changes'}
         </Button>
 
+        {!cancelled && ride.status === 'IN_PROGRESS' ? (
+          <AlertDialog open={completeOpen} onOpenChange={setCompleteOpen}>
+            <AlertDialogTrigger asChild>
+              <Button type="button" variant="outline" size="lg" disabled={completing}>
+                {completing ? 'Completing…' : 'Mark complete'}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Complete this ride?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This closes the ride, stops location sharing, and closes its
+                  chat conversations. Message history stays available but no new
+                  messages can be sent.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Not yet</AlertDialogCancel>
+                <AlertDialogAction onClick={handleComplete}>
+                  Mark complete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        ) : null}
+
         {!cancelled ? (
           <>
-            <AlertDialog open={completeOpen} onOpenChange={setCompleteOpen}>
-              <AlertDialogTrigger asChild>
-                <Button type="button" variant="outline" size="lg" disabled={completing}>
-                  {completing ? 'Completing…' : 'Mark complete'}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Complete this ride?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This closes the ride and its chat conversations. Message
-                    history stays available but no new messages can be sent.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Not yet</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleComplete}>
-                    Mark complete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-
             <AlertDialog open={cancelOpen} onOpenChange={setCancelOpen}>
               <AlertDialogTrigger asChild>
                 <Button type="button" variant="outline" size="lg" disabled={cancelling}>
