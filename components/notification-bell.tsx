@@ -228,7 +228,7 @@ export function NotificationBell() {
         <Bell className="h-4 w-4" />
         {/* Badge is hidden entirely when the count is zero (Section 5). */}
         {unreadCount > 0 ? (
-          <span className="absolute right-0 top-0 flex h-4 min-w-4 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground">
+          <span className="absolute right-0 top-0 flex h-4 min-w-4 -translate-y-1/2 translate-x-1/2 items-center justify-center rounded-full bg-gradient-brand px-1 text-[10px] font-semibold leading-none text-white shadow-sm">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         ) : null}

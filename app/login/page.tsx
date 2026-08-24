@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { AlertCircle, CarFront } from 'lucide-react';
+import { AlertCircle, CarFront, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,16 +18,29 @@ function LoginForm() {
   const callbackUrl = searchParams.get('callbackUrl') ?? '/dashboard';
 
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setLoading(true);
+    setFieldErrors({});
 
     const formData = new FormData(event.currentTarget);
-    const email = String(formData.get('email') ?? '');
+    const email = String(formData.get('email') ?? '').trim();
     const password = String(formData.get('password') ?? '');
+
+    // Per-field inline validation (Section 5.2) — a field-level error is shown
+    // in addition to (not instead of) the top-level auth banner.
+    const nextErrors: Record<string, string[]> = {};
+    if (!email) nextErrors.email = ['Email is required.'];
+    if (!password) nextErrors.password = ['Password is required.'];
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const result = await signIn('credentials', {
@@ -69,20 +82,35 @@ function LoginForm() {
           ) : null}
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            <Field label="Email" htmlFor="email" required>
-              <Input id="email" name="email" type="email" required autoComplete="email" />
+            <Field label="Email" htmlFor="email" required errors={fieldErrors.email}>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                aria-invalid={fieldErrors.email ? true : undefined}
+              />
             </Field>
-            <Field label="Password" htmlFor="password" required>
+            <Field label="Password" htmlFor="password" required errors={fieldErrors.password}>
               <Input
                 id="password"
                 name="password"
                 type="password"
                 required
                 autoComplete="current-password"
+                aria-invalid={fieldErrors.password ? true : undefined}
               />
             </Field>
             <Button type="submit" disabled={loading} className="w-full" size="lg">
-              {loading ? 'Signing in…' : 'Sign in'}
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                'Sign in'
+              )}
             </Button>
           </form>
 

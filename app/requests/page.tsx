@@ -10,6 +10,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { RequestSubNav } from '@/components/request-sub-nav';
 import { RequestStatusBadge } from '@/components/request-status-badge';
 import { CancelRequestButton } from '@/components/cancel-request-button';
+import { RouteLine } from '@/components/route-line';
 
 export const metadata = {
   title: 'My requests'
@@ -92,17 +93,18 @@ export default async function MyRequestsPage() {
             {requests.map((request) => (
               <Card key={request.id}>
                 <CardContent className="p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-medium">
-                        {request.ride.sourceAddress}{' '}
-                        <span className="text-muted-foreground">&rarr;</span>{' '}
-                        {request.ride.destinationAddress}
-                      </div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        {formatDateTime(request.ride.departureTime)} ·{' '}
-                        {request.seatsRequested} seat(s) requested
-                      </div>
+                  <div className="rounded-xl border border-primary/20 bg-gradient-brand-soft p-3">
+                    <RouteLine
+                      source={request.ride.sourceAddress}
+                      destination={request.ride.destinationAddress}
+                      size="sm"
+                      dashed
+                    />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 text-sm text-muted-foreground">
+                      {formatDateTime(request.ride.departureTime)} ·{' '}
+                      {request.seatsRequested} seat(s) requested
                     </div>
                     <RequestStatusBadge status={request.status} />
                   </div>

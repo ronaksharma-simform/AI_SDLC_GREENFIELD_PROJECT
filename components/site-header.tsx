@@ -26,15 +26,16 @@ export async function SiteHeader() {
 
   const primaryItems: NavItem[] = authed
     ? [
-        { href: '/rides/feed', label: 'Find a ride' },
-        { href: '/requests', label: 'Requests' },
-        { href: '/messages', label: 'Messages' },
         { href: '/dashboard', label: 'Dashboard' },
-        { href: '/rides', label: 'My rides' },
-        { href: '/rides/new', label: 'Offer a ride' },
-        { href: '/vehicles/new', label: 'Add vehicle' }
+        { href: '/rides', label: 'Rides' },
+        { href: '/vehicles', label: 'Vehicles' },
+        { href: '/messages', label: 'Messages' }
       ]
     : [];
+
+  // Compact avatar chip derived from the session (Section 6).
+  const displayName = session?.user?.name ?? session?.user?.email ?? '?';
+  const avatarInitial = displayName.charAt(0).toUpperCase();
 
   return (
     <header className="sticky top-0 z-40 w-full">
@@ -64,6 +65,13 @@ export async function SiteHeader() {
                       <Link href={item.href}>{item.label}</Link>
                     </Button>
                   ))}
+                  <span
+                    className="mx-1 flex h-8 w-8 items-center justify-center rounded-full bg-gradient-brand text-sm font-semibold text-white shadow-md shadow-primary/25"
+                    title={displayName}
+                    aria-label={`Signed in as ${displayName}`}
+                  >
+                    {avatarInitial}
+                  </span>
                   <SignOutButton />
                 </>
               ) : (

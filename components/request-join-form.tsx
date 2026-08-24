@@ -21,6 +21,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 interface RequestJoinFormProps {
   rideId: string;
   seatsAvailable: number;
+  /** Optional callback invoked after the request is submitted successfully. */
+  onSubmitted?: () => void;
 }
 
 interface JoinResponse {
@@ -34,7 +36,7 @@ interface JoinResponse {
  * Defaults to 1 seat, optional message, and transitions the request into the
  * Seeker's "My Requests" list as Pending on success.
  */
-export function RequestJoinForm({ rideId, seatsAvailable }: RequestJoinFormProps) {
+export function RequestJoinForm({ rideId, seatsAvailable, onSubmitted }: RequestJoinFormProps) {
   const router = useRouter();
   const [seats, setSeats] = useState('1');
   const [message, setMessage] = useState('');
@@ -69,6 +71,7 @@ export function RequestJoinForm({ rideId, seatsAvailable }: RequestJoinFormProps
         // Re-render the server detail page so it now shows the active-request
         // status in place of this form.
         router.refresh();
+        onSubmitted?.();
       } else if (res.status === 400 && body.details) {
         setFieldErrors(body.details);
         setError(body.error ?? 'Please fix the highlighted fields.');

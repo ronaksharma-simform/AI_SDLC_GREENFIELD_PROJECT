@@ -17,12 +17,13 @@
  */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    /* Page / surface backgrounds */
+    --background: 230 33% 97%; /* --mist (#F6F7FB) — calm page background */
+    --foreground: 240 12% 12%; /* --ink (#14142B) — primary text */
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 240 12% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 240 12% 12%;
     --primary: 245 78% 58%;
     --primary-foreground: 0 0% 100%;
     --secondary: 244 70% 96%;
@@ -37,14 +38,19 @@
     --success-foreground: 0 0% 100%;
     --success-muted: 152 76% 95%;
     --success-muted-foreground: 158 64% 24%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
+    --border: 232 32% 93%; /* --cloud (#E7E9F5) — borders, dividers */
+    --input: 232 32% 93%;
     --ring: 245 85% 60%;
     --coral: 15 88% 58%;
     --coral-foreground: 0 0% 100%;
     --brand-from: 245 85% 58%;
     --brand-to: 15 90% 58%;
     --radius: 0.75rem;
+
+    /* Named "Commute Gradient" tokens (Section 3 of the redesign spec). */
+    --mist: 230 33% 97%;
+    --cloud: 232 32% 93%;
+    --ink: 240 12% 12%;
   }
 
   .dark {
@@ -75,6 +81,11 @@
     --coral-foreground: 0 0% 100%;
     --brand-from: 245 82% 62%;
     --brand-to: 15 90% 58%;
+
+    /* Dark-mode equivalents so the named tokens stay usable in both themes. */
+    --mist: 242 40% 8%;
+    --cloud: 242 30% 16%;
+    --ink: 0 0% 98%;
   }
 }
 
@@ -153,6 +164,42 @@
     stroke-dasharray: 2 10;
     animation: route-dash 1.4s linear infinite;
   }
+
+  /*
+   * CSS route-line motif — a gradient line with a dot at each end. Implemented
+   * as a flex row (dot + line + dot) so it needs no SVG ids and can be reused
+   * freely across server and client components. `.route-line-dashed` animates
+   * the brand-coloured dashes; `.route-line-skeleton` renders a muted grayscale
+   * dashed line that pulses, used for loading states.
+   */
+  .route-line {
+    background-image: linear-gradient(90deg, hsl(var(--brand-from)), hsl(var(--brand-to)));
+  }
+
+  .route-line-dashed {
+    background-image: repeating-linear-gradient(
+      90deg,
+      hsl(var(--brand-from)) 0,
+      hsl(var(--brand-from)) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+    background-size: 24px 100%;
+    animation: route-slide 1.2s linear infinite;
+  }
+
+  .route-line-skeleton {
+    background-image: repeating-linear-gradient(
+      90deg,
+      hsl(var(--border)) 0,
+      hsl(var(--border)) 6px,
+      transparent 6px,
+      transparent 12px
+    );
+    background-size: 24px 100%;
+    animation: route-slide 1.2s linear infinite;
+    opacity: 0.6;
+  }
 }
 
 /* Keyframes referenced by utilities above and by Tailwind `animate-*` helpers. */
@@ -169,6 +216,12 @@
 @keyframes route-dash {
   to {
     stroke-dashoffset: -12;
+  }
+}
+
+@keyframes route-slide {
+  to {
+    background-position: -24px 0;
   }
 }
 
@@ -207,6 +260,8 @@
 @media (prefers-reduced-motion: reduce) {
   .text-gradient-brand-animated,
   .route-dash,
+  .route-line-dashed,
+  .route-line-skeleton,
   .animate-float,
   .animate-fade-up,
   .animate-pulse-soft {
