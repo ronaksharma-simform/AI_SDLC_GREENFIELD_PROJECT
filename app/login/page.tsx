@@ -54,7 +54,7 @@ function LoginForm() {
     <main className="container flex min-h-[70vh] items-center justify-center py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-brand text-primary-foreground shadow-md shadow-primary/25">
             <CarFront className="h-5 w-5" />
           </span>
           <CardTitle className="text-2xl">Sign in to CoRide</CardTitle>

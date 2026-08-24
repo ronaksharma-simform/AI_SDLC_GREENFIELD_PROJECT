@@ -2,12 +2,14 @@ import type { Config } from 'tailwindcss';
 import animate from 'tailwindcss-animate';
 
 /**
- * Tailwind configuration for CoRide.
+ * Tailwind configuration for CoRide — "Commute Gradient" system.
  *
  * The palette is driven entirely by CSS custom properties declared in
  * `app/globals.css` (light + dark themes) so every component, page, and token
- * stays in sync. This is the standard shadcn/ui setup extended with a few
- * domain tokens (`success`) used by alerts and status badges.
+ * stays in sync. This is the standard shadcn/ui setup extended with:
+ *   - `coral` — the warm end of the indigo → coral brand gradient
+ *   - keyframes/animations for the micro-interaction layer (fade-up, float,
+ *     pulse-soft) and the existing accordion primitives.
  */
 const config: Config = {
   darkMode: ['class'],
@@ -49,6 +51,10 @@ const config: Config = {
           muted: 'hsl(var(--success-muted))',
           'muted-foreground': 'hsl(var(--success-muted-foreground))'
         },
+        coral: {
+          DEFAULT: 'hsl(var(--coral))',
+          foreground: 'hsl(var(--coral-foreground))'
+        },
         muted: {
           DEFAULT: 'hsl(var(--muted))',
           foreground: 'hsl(var(--muted-foreground))'
@@ -79,11 +85,26 @@ const config: Config = {
         'accordion-up': {
           from: { height: 'var(--radix-accordion-content-height)' },
           to: { height: '0' }
+        },
+        'fade-up': {
+          '0%': { opacity: '0', transform: 'translateY(14px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-8px)' }
+        },
+        'pulse-soft': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.55' }
         }
       },
       animation: {
         'accordion-down': 'accordion-down 0.2s ease-out',
-        'accordion-up': 'accordion-up 0.2s ease-out'
+        'accordion-up': 'accordion-up 0.2s ease-out',
+        'fade-up': 'fade-up 0.5s ease-out both',
+        float: 'float 6s ease-in-out infinite',
+        'pulse-soft': 'pulse-soft 2.4s ease-in-out infinite'
       }
     }
   },

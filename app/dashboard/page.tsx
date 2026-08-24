@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowRight, CalendarClock, CarFront, Mail, Search, Shield } from 'lucide-react';
+import { ArrowRight, CalendarClock, CarFront, Mail, Search, Shield, Sparkles } from 'lucide-react';
 
 import { getSession } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -55,11 +55,28 @@ export default async function DashboardPage() {
   return (
     <main className="container py-10">
       <div className="mx-auto max-w-4xl space-y-8">
-        <header>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-muted-foreground">
-            Welcome, <span className="font-medium text-foreground">{name ?? email ?? 'rider'}</span>!
-          </p>
+        {/* Gradient hero header */}
+        <header className="relative overflow-hidden rounded-2xl bg-gradient-brand p-8 text-primary-foreground shadow-lg shadow-primary/25">
+          <div
+            className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-white/10"
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute -bottom-12 -left-6 h-40 w-40 rounded-full bg-black/10"
+            aria-hidden="true"
+          />
+          <div className="relative">
+            <p className="flex items-center gap-1.5 text-sm font-medium text-primary-foreground/80">
+              <Sparkles className="h-4 w-4" />
+              Dashboard
+            </p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight">
+              Welcome, {name ?? email ?? 'rider'}!
+            </h1>
+            <p className="mt-1 text-primary-foreground/85">
+              Your CoRide commute at a glance.
+            </p>
+          </div>
         </header>
 
         <Card>
@@ -93,9 +110,9 @@ export default async function DashboardPage() {
           </h2>
           <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {QUICK_ACTIONS.map((action) => (
-              <Card key={action.href} className="transition-shadow hover:shadow-md">
+              <Card key={action.href} hover>
                 <CardContent className="flex flex-col items-start gap-3 p-5">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-brand text-primary-foreground shadow-md shadow-primary/25">
                     <action.icon className="h-5 w-5" />
                   </span>
                   <div>
