@@ -1,80 +1,136 @@
 import Link from 'next/link';
-import { ArrowRight, CalendarClock, CarFront, Route, Users } from 'lucide-react';
+import { ArrowRight, CarFront, Search, ShieldCheck, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { RouteLine } from '@/components/route-line';
+import { CommuteScene } from '@/components/commute-scene';
 
-const FEATURES = [
+/**
+ * How CoRide works — a simple offer / find / ride explanation. The route-line
+ * motif (rather than numbered circles) separates the steps, echoing the
+ * signature "Commute Gradient" identity (Section 5.1).
+ */
+const STEPS = [
   {
-    title: 'Offer rides',
+    title: 'Offer',
     description:
-      'Post a ride in seconds — choose your vehicle, set your route and departure, and publish the seats you want to share.',
+      'Register your vehicle and post a ride — choose your route, departure time, and the seats you want to share.',
     icon: CarFront
   },
   {
-    title: 'Manage vehicles',
+    title: 'Find',
     description:
-      'Register your vehicles once and reuse them across every ride, with seat capacity and type always at hand.',
-    icon: Route
+      'Browse rides from people already verified in your trusted network and request the seat that fits your commute.',
+    icon: Search
   },
   {
-    title: 'Track every journey',
+    title: 'Ride',
     description:
-      'See seat availability, departure times, and ride status at a glance, and update or cancel your own rides anytime.',
-    icon: CalendarClock
+      'Get accepted, message the provider, and hit the road together — all coordinated in one place.',
+    icon: Users
   }
 ];
 
 export default function HomePage() {
   return (
-    <main className="container flex flex-col items-center py-16 md:py-24">
-      <section className="mx-auto flex max-w-3xl flex-col items-center text-center">
-        <span className="inline-flex items-center gap-2 rounded-full border bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
-          <CarFront className="h-3.5 w-3.5" />
-          Carpooling made simple
-        </span>
-        <h1 className="mt-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
-          Ride sharing, reimagined.
-        </h1>
-        <p className="mt-4 max-w-xl text-lg text-muted-foreground">
-          Offer seats in your car, plan your route, and share the journey — all from one clean
-          dashboard.
-        </p>
-        <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-          <Button asChild size="lg">
-            <Link href="/signup">
-              Get started
-              <ArrowRight />
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link href="/login">Sign in</Link>
-          </Button>
+    <main>
+      {/* ── Hero — signature Three.js commute scene ─────────────────────── */}
+      <section className="relative overflow-hidden">
+        {/* Gradient backdrop (also shows through the transparent WebGL canvas). */}
+        <div className="absolute inset-0 z-0 bg-gradient-brand-soft" aria-hidden="true" />
+        {/* Soft fade into the page background below the hero. */}
+        <div
+          className="absolute inset-x-0 bottom-0 z-0 h-24 bg-gradient-to-t from-background to-transparent"
+          aria-hidden="true"
+        />
+        <CommuteScene />
+
+        <div className="container relative z-10 flex min-h-[560px] flex-col items-center justify-center py-20 text-center md:min-h-[640px]">
+          <span className="inline-flex items-center gap-2 rounded-full border border-primary/25 bg-primary/5 px-3 py-1 text-xs font-medium text-primary animate-fade-up">
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Ride with people you trust
+          </span>
+          <h1 className="mt-6 max-w-3xl text-4xl font-extrabold tracking-tight animate-fade-up [animation-delay:80ms] font-display sm:text-5xl md:text-6xl lg:text-7xl">
+            Share your commute with{' '}
+            <span className="text-gradient-brand-animated">people you trust.</span>
+          </h1>
+          <p className="mt-5 max-w-xl text-lg text-muted-foreground animate-fade-up [animation-delay:160ms]">
+            CoRide connects you with riders and drivers inside your organisation — so every shared
+            journey starts with a known, verified face.
+          </p>
+          <div className="mt-9 flex flex-col gap-3 animate-fade-up [animation-delay:240ms] sm:flex-row">
+            <Button asChild size="lg">
+              <Link href="/signup">
+                Get Started
+                <ArrowRight />
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link href="/login">Log In</Link>
+            </Button>
+          </div>
         </div>
       </section>
 
-      <section className="mt-20 grid w-full gap-6 md:grid-cols-3" aria-label="Features">
-        {FEATURES.map((feature) => (
-          <Card key={feature.title} className="transition-shadow hover:shadow-md">
-            <CardContent className="flex flex-col items-start gap-4 p-6">
-              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <feature.icon className="h-5 w-5" />
-              </span>
-              <h2 className="text-lg font-semibold">{feature.title}</h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">{feature.description}</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* ── Route-line motif divider ────────────────────────────────────── */}
+      <section className="container py-10" aria-hidden="true">
+        <RouteLine size="md" dashed className="mx-auto max-w-sm" />
       </section>
 
-      <section className="mt-16 flex max-w-2xl flex-col items-center gap-2 text-center">
-        <Users className="h-8 w-8 text-primary" />
-        <p className="text-sm text-muted-foreground">
-          Ready to hit the road?{' '}
-          <Link href="/rides/new" className="font-medium text-primary underline-offset-4 hover:underline">
-            Offer your first ride
-          </Link>
-        </p>
+      {/* ── How CoRide works: offer / find / ride ───────────────────────── */}
+      <section className="container pb-20" aria-label="How CoRide works">
+        <div className="mx-auto max-w-2xl text-center">
+          <h2 className="font-display text-3xl font-bold tracking-tight">How CoRide works</h2>
+          <p className="mt-2 text-muted-foreground">
+            Three simple steps from posting a ride to sharing the journey.
+          </p>
+        </div>
+
+        <div className="mx-auto mt-12 max-w-3xl">
+          {STEPS.map((step, index) => (
+            <div key={step.title}>
+              <Card hover>
+                <CardContent className="flex flex-col items-start gap-4 p-6 text-center sm:flex-row sm:text-left">
+                  <span className="mx-auto flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-brand text-primary-foreground shadow-md shadow-primary/25 transition-transform duration-300">
+                    <step.icon className="h-6 w-6" />
+                  </span>
+                  <div className="mx-auto sm:mx-0">
+                    <h3 className="font-display text-lg font-semibold">{step.title}</h3>
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      {step.description}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* The route line joins the steps — a literal little journey. */}
+              {index < STEPS.length - 1 ? (
+                <div className="flex justify-center py-6" aria-hidden="true">
+                  <RouteLine size="md" dashed className="max-w-[240px]" />
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Call to action ──────────────────────────────────────────────── */}
+      <section className="container pb-20">
+        <div className="mx-auto flex max-w-2xl flex-col items-center gap-2 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-brand text-primary-foreground shadow-md shadow-primary/25 animate-float">
+            <Users className="h-6 w-6" />
+          </span>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Ready to hit the road?{' '}
+            <Link
+              href="/signup"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
+              Join CoRide and share your first ride
+            </Link>
+          </p>
+        </div>
       </section>
     </main>
   );

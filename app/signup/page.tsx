@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { AlertCircle, CarFront, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CarFront, CheckCircle2, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,18 +15,20 @@ interface RegisterResponse {
   user?: { id: string; email: string; name: string | null; role: string; createdAt: string };
   error?: string;
   message?: string;
+  details?: Record<string, string[]>;
 }
 
 export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setFieldErrors({});
     setSuccess(null);
-    setLoading(true);
 
     const form = event.currentTarget;
     const formData = new FormData(form);
@@ -34,6 +36,17 @@ export default function SignupPage() {
     for (const [key, value] of formData.entries()) {
       if (typeof value === 'string') payload[key] = value;
     }
+
+    // Per-field inline validation (Section 5.3), matching the Login pattern.
+    const nextErrors: Record<string, string[]> = {};
+    if (!String(payload.email ?? '').trim()) nextErrors.email = ['Email is required.'];
+    if (!String(payload.password ?? '')) nextErrors.password = ['Password is required.'];
+    if (Object.keys(nextErrors).length > 0) {
+      setFieldErrors(nextErrors);
+      return;
+    }
+
+    setLoading(true);
 
     try {
       const res = await fetch('/api/auth/register', {
@@ -45,6 +58,9 @@ export default function SignupPage() {
       if (res.ok && body.ok) {
         setSuccess('Your account was created. You can now sign in.');
         form.reset();
+      } else if (res.status === 400 && body.details) {
+        setFieldErrors(body.details);
+        setError(body.error ?? 'Please fix the highlighted fields.');
       } else {
         setError(body.error ?? 'Something went wrong. Please try again.');
       }
@@ -59,7 +75,7 @@ export default function SignupPage() {
     <main className="container flex min-h-[70vh] items-center justify-center py-12">
       <Card className="w-full max-w-md">
         <CardHeader className="items-center text-center">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-brand text-primary-foreground shadow-md shadow-primary/25">
             <CarFront className="h-5 w-5" />
           </span>
           <CardTitle className="text-2xl">Create your CoRide account</CardTitle>
@@ -80,17 +96,36 @@ export default function SignupPage() {
           ) : null}
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
-            <Field label="Name" htmlFor="name" hint="Optional — this is how other riders see you.">
-              <Input id="name" name="name" type="text" autoComplete="name" />
+            <Field
+              label="Name"
+              htmlFor="name"
+              hint="Optional — this is how other riders see you."
+              errors={fieldErrors.name}
+            >
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                autoComplete="name"
+                aria-invalid={fieldErrors.name ? true : undefined}
+              />
             </Field>
-            <Field label="Email" htmlFor="email" required>
-              <Input id="email" name="email" type="email" required autoComplete="email" />
+            <Field label="Email" htmlFor="email" required errors={fieldErrors.email}>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                aria-invalid={fieldErrors.email ? true : undefined}
+              />
             </Field>
             <Field
               label="Password"
               htmlFor="password"
               required
               hint="At least 8 characters."
+              errors={fieldErrors.password}
             >
               <Input
                 id="password"
@@ -99,10 +134,18 @@ export default function SignupPage() {
                 required
                 minLength={8}
                 autoComplete="new-password"
+                aria-invalid={fieldErrors.password ? true : undefined}
               />
             </Field>
             <Button type="submit" disabled={loading} className="w-full" size="lg">
-              {loading ? 'Creating account…' : 'Sign up'}
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Creating account…
+                </>
+              ) : (
+                'Sign up'
+              )}
             </Button>
           </form>
 

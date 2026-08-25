@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MESSAGE_CONTENT_MAX } from '@/lib/conversations';
 
 /**
  * Zod schema for `POST /api/auth/register`.
@@ -154,6 +155,49 @@ export const locationInputSchema = z.object({
 export type LocationInput = z.infer<typeof locationInputSchema>;
 
 /**
+ * The Payment & Cost-Splitting module's trip-cost value.
+ *
+ * - Stored/transported in the smallest currency unit (paise) as a whole number.
+ * - Must be a positive amount when provided (§12 — Validation Rules).
+ * - `null` clears a previously-declared cost; `undefined` (only when used with
+ *   `.optional()`) means "leave unchanged" on a partial update.
+ */
+const rideTotalCostField = z.union([
+  z.coerce
+    .number()
+    .int('Trip cost must be a whole number of paise.')
+    .positive('Trip cost must be a positive amount.'),
+  z.null()
+]);
+
+/**
+ * Zod schema for `PATCH /api/rides/{id}/cost`.
+ *
+ * The dedicated endpoint for declaring/updating a ride's optional trip cost.
+ * `totalCost` is required here (a number of paise, or `null` to clear it).
+ * Whether it may change is decided by the route based on `costFinalizedAt`
+ * (once a ride is Completed its split is frozen — PAY-5).
+ */
+export const rideCostSchema = z.object({
+  totalCost: rideTotalCostField
+});
+
+export type RideCostInput = z.infer<typeof rideCostSchema>;
+
+/**
+ * Zod schema for `PATCH /api/requests/{id}/payment`.
+ *
+ * The Provider flips a Seeker's settlement row between Paid and Unpaid. Only the
+ * two enum values are accepted; whether the caller *may* change it is decided by
+ * the route (ride's Provider only — PAY-6).
+ */
+export const paymentStatusUpdateSchema = z.object({
+  paymentStatus: z.enum(['PAID', 'UNPAID'])
+});
+
+export type PaymentStatusUpdateInput = z.infer<typeof paymentStatusUpdateSchema>;
+
+/**
  * Zod schema for `POST /api/rides`.
  *
  * - `vehicleId` must be a UUID. Ownership of the referenced vehicle is verified
@@ -186,7 +230,8 @@ export const rideCreateSchema = z.object({
     .trim()
     .max(RIDE_NOTES_MAX, `Notes must be at most ${RIDE_NOTES_MAX} characters long.`)
     .optional()
-    .transform((value) => (value && value.length > 0 ? value : undefined))
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
+  totalCost: rideTotalCostField.optional()
 });
 
 export type RideCreateInput = z.infer<typeof rideCreateSchema>;
@@ -218,7 +263,176 @@ export const rideUpdateSchema = z.object({
     .max(RIDE_NOTES_MAX, `Notes must be at most ${RIDE_NOTES_MAX} characters long.`)
     .nullable()
     .optional()
-    .transform((value) => (value === undefined ? undefined : value === '' || value === null ? null : value))
+    .transform((value) => (value === undefined ? undefined : value === '' || value === null ? null : value)),
+  totalCost: rideTotalCostField.optional()
 });
 
 export type RideUpdateInput = z.infer<typeof rideUpdateSchema>;
+
+/**
+ * Zod schema for `POST /api/rides/{id}/location`.
+ *
+ * The Provider's device reports a fresh position while the trip is In Progress.
+ * Both coordinates are required and bounded to valid coordinate ranges
+ * (Section 11 — Validation Rules). Rate-limiting is applied in the route based
+ * on the ride's last `locationUpdatedAt`, not here.
+ */
+export const locationUpdateSchema = z.object({
+  latitude: z.coerce
+    .number()
+    .min(-90, 'Latitude must be between -90 and 90.')
+    .max(90, 'Latitude must be between -90 and 90.'),
+  longitude: z.coerce
+    .number()
+    .min(-180, 'Longitude must be between -180 and 180.')
+    .max(180, 'Longitude must be between -180 and 180.')
+});
+
+export type LocationUpdateInput = z.infer<typeof locationUpdateSchema>;
+
+/**
+ * Zod schema for `POST /api/rides/{id}/requests`.
+ *
+ * - `seatsRequested` is coerced from a number or numeric string and must be a
+ *   positive integer. Whether it exceeds the ride's current availability is
+ *   checked in the route after the ride is loaded (REQ-19a).
+ * - `message` is optional, trimmed, and capped at 280 characters (matches the
+ *   `ride_requests.message` column).
+ */
+export const rideRequestCreateSchema = z.object({
+  seatsRequested: z.coerce
+    .number()
+    .int('Seats must be a whole number.')
+    .min(1, 'Seats must be at least 1.'),
+  message: z
+    .string()
+    .trim()
+    .max(RIDE_NOTES_MAX, `Message must be at most ${RIDE_NOTES_MAX} characters long.`)
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined))
+});
+
+export type RideRequestCreateInput = z.infer<typeof rideRequestCreateSchema>;
+
+/**
+ * Zod schema for `POST /api/conversations/{id}/messages`.
+ *
+ * - `content` is required, trimmed, and capped at `MESSAGE_CONTENT_MAX`
+ *   characters. It is additionally sanitized (HTML stripped, control chars
+ *   normalised) in `lib/conversations.sanitizeMessageContent` before storage.
+ */
+export const messageCreateSchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, 'Message cannot be empty.')
+    .max(MESSAGE_CONTENT_MAX, `Message must be at most ${MESSAGE_CONTENT_MAX} characters long.`)
+});
+
+export type MessageCreateInput = z.infer<typeof messageCreateSchema>;
+
+/**
+ * Resolves an optional environment override for a numeric default, falling back
+ * to `fallback` when the variable is unset, empty, or not a positive number.
+ *
+ * Both feed defaults live behind environment variables so product/ops can tune
+ * them without a code change (Part B — REQ-7). The variables are read once at
+ * module load; tests can set `process.env` before importing this module.
+ */
+function envPositiveNumber(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === '') return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/**
+ * Default departure-time tolerance for the discovery feed (±30 minutes).
+ * Configurable via `FEED_DEFAULT_TIME_WINDOW_MINUTES` (REQ-7).
+ */
+export const DEFAULT_FEED_TOLERANCE_MINUTES = envPositiveNumber(
+  process.env.FEED_DEFAULT_TIME_WINDOW_MINUTES,
+  30
+);
+
+/**
+ * Default proximity radius for the discovery feed (500 meters) applied when the
+ * Seeker supplies a pickup point (`lat`/`lng`) but no explicit `radius`.
+ * Configurable via `FEED_DEFAULT_RADIUS_METERS` (REQ-7).
+ */
+export const DEFAULT_PROXIMITY_RADIUS_METERS = envPositiveNumber(
+  process.env.FEED_DEFAULT_RADIUS_METERS,
+  500
+);
+
+/**
+ * Zod schema for the query string of `GET /api/rides/feed`.
+ *
+ * Every filter is optional. When absent, no constraint is applied for that
+ * dimension.
+ *
+ * - `source` / `destination` are free-text route filters, matched
+ *   case-insensitively against the ride's stored addresses.
+ * - `time` must be a valid date/time. When provided, only rides whose departure
+ *   falls within `±window` (or `±toleranceMinutes`) of that time are returned
+ *   (REQ-13a).
+ * - `seats` must be a positive integer; only rides with at least that many
+ *   available seats are returned (REQ-13b).
+ * - `toleranceMinutes` configures the time window; defaults to 30 (REQ-13a).
+ *   Kept for backwards compatibility with the base feed spec.
+ * - `window` is the Part B name for the same time-window filter; a positive
+ *   number of minutes, defaults to 30. Takes precedence over
+ *   `toleranceMinutes` when both are provided.
+ * - `lat` / `lng` are the Seeker's pickup-point coordinates. When **both** are
+ *   provided, only rides whose pickup point lies within `radius` meters are
+ *   returned (proximity filter, Part B REQ-1/REQ-2).
+ * - `radius` is a positive number of meters; defaults to
+ *   `DEFAULT_PROXIMITY_RADIUS_METERS` (500m) when omitted (REQ-2).
+ */
+export const rideFeedQuerySchema = z.object({
+  source: z
+    .string()
+    .trim()
+    .min(1, 'Source must not be empty.')
+    .max(RIDE_ADDRESS_MAX, `Source must be at most ${RIDE_ADDRESS_MAX} characters long.`)
+    .optional(),
+  destination: z
+    .string()
+    .trim()
+    .min(1, 'Destination must not be empty.')
+    .max(RIDE_ADDRESS_MAX, `Destination must be at most ${RIDE_ADDRESS_MAX} characters long.`)
+    .optional(),
+  time: z.coerce.date().optional(),
+  seats: z.coerce
+    .number()
+    .int('Seats must be a whole number.')
+    .min(1, 'Seats must be at least 1.')
+    .optional(),
+  toleranceMinutes: z.coerce
+    .number()
+    .int('Tolerance must be a whole number of minutes.')
+    .min(0, 'Tolerance must be at least 0 minutes.')
+    .max(1440, 'Tolerance must be at most 1440 minutes.')
+    .optional(),
+  window: z.coerce
+    .number()
+    .positive('Window must be a positive number of minutes.')
+    .max(1440, 'Window must be at most 1440 minutes.')
+    .optional(),
+  lat: z.coerce
+    .number()
+    .min(-90, 'Latitude must be between -90 and 90.')
+    .max(90, 'Latitude must be between -90 and 90.')
+    .optional(),
+  lng: z.coerce
+    .number()
+    .min(-180, 'Longitude must be between -180 and 180.')
+    .max(180, 'Longitude must be between -180 and 180.')
+    .optional(),
+  radius: z.coerce
+    .number()
+    .positive('Radius must be a positive number of meters.')
+    .max(50000, 'Radius must be at most 50000 meters.')
+    .optional()
+});
+
+export type RideFeedQueryInput = z.infer<typeof rideFeedQuerySchema>;

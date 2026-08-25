@@ -1,0 +1,214 @@
+import Link from 'next/link';
+import { notFound, redirect } from 'next/navigation';
+import { ShieldCheck, Users } from 'lucide-react';
+
+import { getSession } from '@/lib/auth';
+import { prisma } from '@/lib/prisma';
+import { formatDateTime } from '@/lib/format-date';
+import { vehicleTypeLabel } from '@/lib/vehicle';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { RouteLine } from '@/components/route-line';
+import { RequestStatusBadge } from '@/components/request-status-badge';
+import { RequestJoinDialog } from '@/components/request-join-dialog';
+import { CostSplitBadge } from '@/components/cost-split-badge';
+import { MyShareCard } from '@/components/my-share-card';
+import { LiveTripView } from '@/components/live-trip-view';
+
+export const metadata = {
+  title: 'Ride details'
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  ACTIVE: 'Active',
+  FULL: 'Full',
+  IN_PROGRESS: 'In Progress',
+  CANCELLED: 'Cancelled',
+  COMPLETED: 'Completed'
+};
+
+export default async function RideFeedDetailPage({
+  params
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+
+  const session = await getSession();
+  if (!session?.user?.id) {
+    redirect('/login');
+  }
+
+  const ride = await prisma.ride.findUnique({
+    where: { id },
+    include: {
+      vehicle: true,
+      provider: { select: { id: true, name: true, email: true } }
+    }
+  });
+
+  if (!ride) {
+    notFound();
+  }
+
+  // Part A §5: if the Seeker already has an active request on this ride, the
+  // request action is replaced with the current request status.
+  const activeRequest = await prisma.rideRequest.findFirst({
+    where: {
+      rideId: id,
+      seekerId: session.user.id,
+      status: { in: ['PENDING', 'ACCEPTED'] }
+    }
+  });
+
+  const isOwnRide = ride.providerId === session.user.id;
+  const requestable = !isOwnRide && ride.status === 'ACTIVE' && ride.seatsAvailable > 0;
+
+  return (
+    <main className="container py-10">
+      <div className="mx-auto max-w-2xl space-y-6">
+        <header>
+          <h1 className="text-3xl font-bold tracking-tight">Ride details</h1>
+          <p className="mt-1 text-muted-foreground">
+            <Link href="/rides/feed" className="text-primary underline-offset-4 hover:underline">
+              &larr; Back to the feed
+            </Link>
+          </p>
+        </header>
+
+        <Card>
+          <CardContent className="p-6">
+            {/* The route line rendered large and centered, with the departure
+                time in the mono data type beneath (Section 5.9). */}
+            <div className="rounded-xl border border-primary/20 bg-gradient-brand-soft p-6">
+              <RouteLine
+                source={ride.sourceAddress}
+                destination={ride.destinationAddress}
+                size="lg"
+                dashed
+              />
+              <p className="mt-4 text-center font-mono text-sm text-muted-foreground">
+                Departs {formatDateTime(ride.departureTime)}
+              </p>
+            </div>
+            <div className="mt-4 flex justify-center">
+              <CostSplitBadge rideId={ride.id} />
+            </div>
+          </CardContent>
+          <CardContent className="pt-0">
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-sm text-muted-foreground">Provider</dt>
+                <dd className="mt-0.5 font-medium">
+                  {ride.provider.name ?? ride.provider.email}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-sm text-muted-foreground">Vehicle</dt>
+                <dd className="mt-0.5 font-medium">
+                  {ride.vehicle.year} {ride.vehicle.make} {ride.vehicle.model} (
+                  {vehicleTypeLabel(ride.vehicle.vehicleType)})
+                </dd>
+              </div>
+              <div>
+                <dt className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <Users className="h-3.5 w-3.5" />
+                  Seats available
+                </dt>
+                <dd className="mt-0.5 font-medium">
+                  {ride.seatsAvailable} of {ride.seatsTotal}
+                </dd>
+              </div>
+              <div>
+                <dt className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  Status
+                </dt>
+                <dd className="mt-0.5 font-medium">
+                  {STATUS_LABELS[ride.status] ?? ride.status}
+                </dd>
+              </div>
+              {ride.notes ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-sm text-muted-foreground">Provider notes</dt>
+                  <dd className="mt-0.5 font-medium">{ride.notes}</dd>
+                </div>
+              ) : null}
+            </dl>
+          </CardContent>
+        </Card>
+
+        {activeRequest ? (
+          <Card>
+            <CardContent className="flex flex-col items-start gap-3 py-6">
+              <div>
+                <h2 className="font-semibold">Request sent</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  You already have an active request on this ride.
+                </p>
+              </div>
+              <RequestStatusBadge status={activeRequest.status} />
+              <div className="flex gap-3">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/requests">View my requests</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ) : isOwnRide ? (
+          <Alert>
+            <AlertTitle>This is your own ride</AlertTitle>
+            <AlertDescription>
+              You offered this ride, so you can&rsquo;t request a seat on it.
+              <Link
+                href={`/rides/${ride.id}`}
+                className="ml-1 text-primary underline-offset-4 hover:underline"
+              >
+                View or edit it
+              </Link>{' '}
+              instead.
+            </AlertDescription>
+          </Alert>
+        ) : requestable ? (
+          <RequestJoinDialog rideId={ride.id} seatsAvailable={ride.seatsAvailable} />
+        ) : (
+          <Alert variant="warning">
+            <AlertTitle>Not accepting requests</AlertTitle>
+            <AlertDescription>
+              This ride is no longer open for requests.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {activeRequest?.status === 'ACCEPTED' &&
+        (ride.status === 'IN_PROGRESS' || ride.status === 'COMPLETED') ? (
+          <LiveTripView
+            rideId={ride.id}
+            initial={{
+              id: ride.id,
+              status: ride.status,
+              startedAt: ride.startedAt ? ride.startedAt.toISOString() : null,
+              completedAt: ride.completedAt ? ride.completedAt.toISOString() : null,
+              currentLatitude: ride.currentLatitude != null ? Number(ride.currentLatitude) : null,
+              currentLongitude: ride.currentLongitude != null ? Number(ride.currentLongitude) : null,
+              locationUpdatedAt: ride.locationUpdatedAt
+                ? ride.locationUpdatedAt.toISOString()
+                : null,
+              sourceLatitude: ride.sourceLatitude != null ? Number(ride.sourceLatitude) : null,
+              sourceLongitude: ride.sourceLongitude != null ? Number(ride.sourceLongitude) : null,
+              destinationLatitude:
+                ride.destinationLatitude != null ? Number(ride.destinationLatitude) : null,
+              destinationLongitude:
+                ride.destinationLongitude != null ? Number(ride.destinationLongitude) : null
+            }}
+          />
+        ) : null}
+
+        {activeRequest?.status === 'ACCEPTED' && ride.status === 'COMPLETED' ? (
+          <MyShareCard rideId={ride.id} />
+        ) : null}
+      </div>
+    </main>
+  );
+}

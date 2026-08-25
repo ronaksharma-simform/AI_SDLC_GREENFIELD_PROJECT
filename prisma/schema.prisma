@@ -33,8 +33,37 @@ enum VehicleType {
 enum RideStatus {
   ACTIVE
   FULL
+  IN_PROGRESS
   CANCELLED
   COMPLETED
+}
+
+enum RideRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+/// Settlement state for a Seeker's frozen share of a ride's cost split.
+enum PaymentStatus {
+  UNPAID
+  PAID
+}
+
+enum ConversationStatus {
+  ACTIVE
+  CLOSED
+}
+
+enum NotificationType {
+  RideRequestReceived
+  RideRequestAccepted
+  RideRequestRejected
+  TripReminder
+  NewMessage
+  TripStarted
+  TripCompleted
 }
 
 model User {
@@ -43,10 +72,15 @@ model User {
   passwordHash String   @map("password_hash") @db.VarChar(255)
   name         String?  @db.VarChar(100)
   role         Role       @default(USER)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
-  vehicles     Vehicle[]
-  rides        Ride[]
+  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  vehicles             Vehicle[]
+  rides                Ride[]
+  rideRequests         RideRequest[]
+  conversationsAsProvider Conversation[] @relation("ConversationProvider")
+  conversationsAsSeeker   Conversation[] @relation("ConversationSeeker")
+  messagesSent            Message[]       @relation("MessageSender")
+  notifications           Notification[]
 
   @@map("users")
 }
@@ -86,13 +120,123 @@ model Ride {
   seatsAvailable       Int        @map("seats_available")
   status               RideStatus @default(ACTIVE)
   notes                String?    @db.VarChar(280)
+  totalCost            Decimal?   @map("total_cost") @db.Decimal(12, 2)
+  costFinalizedAt      DateTime?  @map("cost_finalized_at") @db.Timestamptz(6)
   createdAt            DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt            DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  reminderSentAt       DateTime?  @map("reminder_sent_at") @db.Timestamptz(6)
+  // Trip Start & Live Location Tracking — Provider's most recently reported
+  // position while the trip is In Progress (Section 4.1). The live map reads
+  // these single fields rather than querying the history table (Section 12).
+  currentLatitude      Decimal?   @map("current_latitude") @db.Decimal(9, 6)
+  currentLongitude     Decimal?   @map("current_longitude") @db.Decimal(9, 6)
+  locationUpdatedAt    DateTime?  @map("location_updated_at") @db.Timestamptz(6)
+  startedAt            DateTime?  @map("started_at") @db.Timestamptz(6)
+  completedAt          DateTime?  @map("completed_at") @db.Timestamptz(6)
 
-  provider User    @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  vehicle  Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  provider      User                @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  vehicle       Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  requests      RideRequest[]
+  conversations Conversation[]
+  notifications Notification[]
+  locationSnapshots RideLocationSnapshot[]
 
   @@index([providerId])
   @@index([vehicleId])
   @@map("rides")
+}
+
+/// Trip Location History (Section 4.2) — periodic snapshots of the Provider's
+/// position during an In Progress trip, used for dispute resolution and safety
+/// review after the fact. NOT the source of the live map.
+model RideLocationSnapshot {
+  id         String   @id @default(uuid()) @db.Uuid
+  rideId     String   @map("ride_id") @db.Uuid
+  latitude   Decimal  @db.Decimal(9, 6)
+  longitude  Decimal  @db.Decimal(9, 6)
+  recordedAt DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+
+  ride Ride @relation(fields: [rideId], references: [id], onDelete: Cascade)
+
+  @@index([rideId, recordedAt])
+  @@map("ride_location_snapshots")
+}
+
+model RideRequest {
+  id             String            @id @default(uuid()) @db.Uuid
+  rideId         String            @map("ride_id") @db.Uuid
+  seekerId       String            @map("seeker_id") @db.Uuid
+  seatsRequested Int               @map("seats_requested")
+  status         RideRequestStatus @default(PENDING)
+  message        String?           @db.VarChar(280)
+  shareAmount    Decimal?          @map("share_amount") @db.Decimal(12, 2)
+  paymentStatus  PaymentStatus     @default(UNPAID) @map("payment_status")
+  paidAt         DateTime?         @map("paid_at") @db.Timestamptz(6)
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  respondedAt    DateTime?         @map("responded_at") @db.Timestamptz(6)
+
+  ride          Ride            @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  seeker        User            @relation(fields: [seekerId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([rideId])
+  @@index([seekerId])
+  @@index([rideId, seekerId, status])
+  @@map("ride_requests")
+}
+
+model Conversation {
+  id         String             @id @default(uuid()) @db.Uuid
+  rideId     String             @map("ride_id") @db.Uuid
+  providerId String             @map("provider_id") @db.Uuid
+  seekerId   String             @map("seeker_id") @db.Uuid
+  status     ConversationStatus @default(ACTIVE)
+  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  closedAt   DateTime?          @map("closed_at") @db.Timestamptz(6)
+
+  ride     Ride      @relation(fields: [rideId], references: [id], onDelete: Cascade)
+  provider User      @relation("ConversationProvider", fields: [providerId], references: [id], onDelete: Cascade)
+  seeker   User      @relation("ConversationSeeker", fields: [seekerId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  // A conversation is a 1:1 chat per accepted ride/request pairing (Part A §3.3).
+  @@unique([rideId, providerId, seekerId])
+  @@index([providerId])
+  @@index([seekerId])
+  @@map("conversations")
+}
+
+model Message {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  senderId       String   @map("sender_id") @db.Uuid
+  content        String   @db.Text
+  sentAt         DateTime @default(now()) @map("sent_at") @db.Timestamptz(6)
+  readAt         DateTime? @map("read_at") @db.Timestamptz(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, sentAt])
+  @@map("messages")
+}
+
+model Notification {
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
+  type             NotificationType @map("type")
+  title            String           @db.VarChar(120)
+  message          String           @db.VarChar(280)
+  relatedRideId    String?          @map("related_ride_id") @db.Uuid
+  relatedRequestId String?          @map("related_request_id") @db.Uuid
+  isRead           Boolean          @default(false) @map("is_read")
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  relatedRide    Ride?        @relation(fields: [relatedRideId], references: [id], onDelete: SetNull)
+  relatedRequest RideRequest? @relation(fields: [relatedRequestId], references: [id], onDelete: SetNull)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
 }

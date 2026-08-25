@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Hoisted so the vi.mock factories can reference them.
-const { mockGetSession, mockRideFindUnique, mockRideUpdate, mockVehicleFindUnique } = vi.hoisted(() => ({
+const {
+  mockGetSession,
+  mockRideFindUnique,
+  mockRideUpdate,
+  mockVehicleFindUnique,
+  mockConversationUpdateMany
+} = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
   mockRideFindUnique: vi.fn(),
   mockRideUpdate: vi.fn(),
-  mockVehicleFindUnique: vi.fn()
+  mockVehicleFindUnique: vi.fn(),
+  mockConversationUpdateMany: vi.fn()
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -20,6 +27,9 @@ vi.mock('@/lib/prisma', () => ({
     },
     vehicle: {
       findUnique: mockVehicleFindUnique
+    },
+    conversation: {
+      updateMany: mockConversationUpdateMany
     }
   }
 }));
@@ -135,14 +145,15 @@ describe('GET /api/rides/{id}', () => {
     expect(body.error).toContain('not found');
   });
 
-  it('returns 404 (not 403) for a ride owned by another user', async () => {
+  it('returns the ride to an authenticated non-owner (discovery feed detail view)', async () => {
     mockRideFindUnique.mockResolvedValue({ ...baseRide, providerId: OTHER_USER_ID });
 
     const res = await GET(makeRequest(), params(RIDE_ID));
 
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.error).toContain('not found');
+    expect(body.ok).toBe(true);
+    expect(body.ride.providerId).toBe(OTHER_USER_ID);
   });
 
   it('returns the ride for its owner', async () => {
@@ -332,6 +343,43 @@ describe('PATCH /api/rides/{id}', () => {
     expect(mockRideUpdate).not.toHaveBeenCalled();
   });
 
+  it('updates totalCost even when the ride is locked by accepted seats (PAY-1)', async () => {
+    mockRideFindUnique.mockResolvedValue(lockedRide);
+    const updated = { ...lockedRide, totalCost: 15000 };
+    mockRideUpdate.mockResolvedValue(updated);
+
+    const res = await PATCH(
+      makeRequest(JSON.stringify({ totalCost: 15000 }), 'PATCH'),
+      params(RIDE_ID)
+    );
+
+    expect(res.status).toBe(200);
+    expect(mockRideUpdate).toHaveBeenCalledWith({
+      where: { id: RIDE_ID },
+      data: { totalCost: 15000 },
+      include: { vehicle: true }
+    });
+  });
+
+  it('rejects a totalCost edit once the ride is completed (split frozen, PAY-5)', async () => {
+    mockRideFindUnique.mockResolvedValue({
+      ...baseRide,
+      status: 'COMPLETED',
+      totalCost: 12000,
+      costFinalizedAt: '2026-08-20T00:00:00.000Z'
+    });
+
+    const res = await PATCH(
+      makeRequest(JSON.stringify({ totalCost: 15000 }), 'PATCH'),
+      params(RIDE_ID)
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.error).toContain('locked');
+    expect(mockRideUpdate).not.toHaveBeenCalled();
+  });
+
   it('applies a full edit (vehicle + seats + fields) when unlocked', async () => {
     mockRideFindUnique.mockResolvedValue(currentRide);
     mockVehicleFindUnique.mockResolvedValue(newVehicle);
@@ -437,6 +485,8 @@ describe('DELETE /api/rides/{id}', () => {
     mockGetSession.mockReset();
     mockRideFindUnique.mockReset();
     mockRideUpdate.mockReset();
+    mockConversationUpdateMany.mockReset();
+    mockConversationUpdateMany.mockResolvedValue({ count: 0 });
     mockGetSession.mockResolvedValue(session);
   });
 
@@ -488,6 +538,11 @@ describe('DELETE /api/rides/{id}', () => {
     expect(mockRideUpdate).toHaveBeenCalledWith({
       where: { id: RIDE_ID },
       data: { status: 'CANCELLED' }
+    });
+    // REQ-6: cancelling a ride closes its chat conversations.
+    expect(mockConversationUpdateMany).toHaveBeenCalledWith({
+      where: { rideId: RIDE_ID, status: 'ACTIVE' },
+      data: { status: 'CLOSED', closedAt: expect.any(Date) }
     });
   });
 
