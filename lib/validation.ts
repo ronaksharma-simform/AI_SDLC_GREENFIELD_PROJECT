@@ -8,3 +8,16 @@ export const registerSchema = z.object({
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
+
+/**
+ * Validates a sign-in attempt. Deliberately only checks shape (a valid email
+ * and a non-empty password): credential *correctness* is verified by
+ * NextAuth's `authorize` and any failure there is reported generically, so
+ * this schema must never be the source of a "user not found" style hint.
+ */
+export const loginSchema = z.object({
+  email: z.string().trim().toLowerCase().email('A valid email is required'),
+  password: z.string().min(1, 'Password is required'),
+});
+
+export type LoginInput = z.infer<typeof loginSchema>;
